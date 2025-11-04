@@ -8,7 +8,6 @@ spring:
     username: root
     password: Study1234! # (??? ? ??? ???? DB ????)
     driver-class-name: com.mysql.cj.jdbc.Driver
-
   # 2. JPA (ORM) ??
   jpa:
     hibernate:

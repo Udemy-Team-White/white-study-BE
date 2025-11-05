@@ -2,6 +2,7 @@ package teamprojects.demo.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
@@ -27,7 +28,7 @@ public class Study {
     private String studyName;
 
     @Column(name = "study_type", nullable = false, length = 50)
-    private String studyType; // (Default: 'ONLINE' -> @DynamicInsert로 처리)
+    private String studyType;
 
     @Column(name = "title", nullable = false, length = 100)
     private String title;
@@ -57,12 +58,34 @@ public class Study {
     @Column(name = "todo_cycle", length = 50)
     private String todoCycle;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "leader_id") // (DB의 'leader_id' FK 컬럼)
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "leader_id")
     private User leader;
 
     @OneToMany(mappedBy = "study", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StudyHasCategory> categoryMappings = new ArrayList<>();
 
-    // (builder 등은 후에 추가하겠습니다.)
+    @OneToMany(mappedBy = "study", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<StudyMember> studyMembers = new ArrayList<>();
+
+
+    @Builder
+    public Study(User leader, String studyName, String studyType, String title,
+                 String content, Integer maxMembers, String status,
+                 LocalDateTime closedAt, LocalDateTime startDate,
+                 LocalDateTime endDate, String todoCycle) {
+
+        this.leader = leader;
+        this.studyName = studyName;
+        this.studyType = studyType;
+        this.title = title;
+        this.content = content;
+        this.maxMembers = maxMembers;
+        this.status = status;
+        this.closedAt = closedAt;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.todoCycle = todoCycle;
+    }
 }

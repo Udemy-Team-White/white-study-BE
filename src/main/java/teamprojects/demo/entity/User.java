@@ -1,5 +1,6 @@
 package teamprojects.demo.entity;
 
+import teamprojects.demo.entity.UserRole;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -26,14 +27,24 @@ public class User {
     @Column(name = "salt", nullable = false)
     private String salt;
 
+    @Column(name = "username", nullable = false, length = 10, unique = true)
+    private String username;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private UserRole role;
+
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private UserProfile userProfile;
 
     @Builder
-    public User(String email, String password, String salt) {
+    public User(String email, String password, String salt, String username, UserRole role) {
         this.email = email;
         this.password = password;
         this.salt = salt;
+        this.username = username;
+        this.role = role;
     }
 
     public void setUserProfile(UserProfile userProfile) {

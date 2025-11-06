@@ -1,4 +1,8 @@
 package teamprojects.demo.repository;
 
-public interface StudyCategoryRepository {
+import org.springframework.data.jpa.repository.JpaRepository;
+import teamprojects.demo.entity.StudyCategory;
+
+public interface StudyCategoryRepository extends JpaRepository<StudyCategory, Long> {
+
 }

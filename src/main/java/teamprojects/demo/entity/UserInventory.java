@@ -20,7 +20,7 @@ public class UserInventory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "inventory_id", nullable = false)
-    private Long id;
+    private Integer id;
 
     @CreationTimestamp
     @Column(name = "acquired_at", nullable = false, updatable = false)

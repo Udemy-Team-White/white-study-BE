@@ -10,7 +10,7 @@ import teamprojects.demo.entity.User;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-public interface SelfReportRepository extends JpaRepository<SelfReport, Long> {
+public interface SelfReportRepository extends JpaRepository<SelfReport, Integer> {
 
     // (API 5-9: 스터디의 보고서 목록 '페이지네이션' 조회 시 사용)
     Page<SelfReport> findByStudyOrderByCreatedAtDesc(Study study, Pageable pageable);

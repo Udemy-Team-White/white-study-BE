@@ -7,7 +7,7 @@ import teamprojects.demo.entity.StoreItem;
 import teamprojects.demo.entity.User;
 import teamprojects.demo.entity.UserInventory;
 
-public interface UserInventoryRepository extends JpaRepository<UserInventory, Long> {
+public interface UserInventoryRepository extends JpaRepository<UserInventory, Integer> {
 
     // (API 6-3: '내 인벤토리' 페이징 조회 시 사용)
     Page<UserInventory> findByUser(User user, Pageable pageable);

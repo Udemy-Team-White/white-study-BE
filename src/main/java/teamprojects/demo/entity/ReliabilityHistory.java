@@ -18,7 +18,7 @@ public class ReliabilityHistory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "history_id", nullable = false)
-    private Long id;
+    private Integer id;
 
     @Column(name = "change_amount", nullable = false)
     private Integer changeAmount;

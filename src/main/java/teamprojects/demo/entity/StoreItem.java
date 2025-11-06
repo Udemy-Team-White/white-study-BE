@@ -21,7 +21,7 @@ public class StoreItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "item_id", nullable = false)
-    private Long id;
+    private Integer id;
 
     @Column(name = "item_name", nullable = false, length = 50)
     private String itemName;

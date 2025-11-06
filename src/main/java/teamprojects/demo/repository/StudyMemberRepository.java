@@ -8,7 +8,7 @@ import teamprojects.demo.entity.User;
 import java.util.List;
 import java.util.Optional;
 
-public interface StudyMemberRepository extends JpaRepository<StudyMember, Long> {
+public interface StudyMemberRepository extends JpaRepository<StudyMember, Integer> {
 
     // (API 3-4: 스터디의 확정 멤버 목록 조회 시 사용)
     List<StudyMember> findByStudy(Study study);

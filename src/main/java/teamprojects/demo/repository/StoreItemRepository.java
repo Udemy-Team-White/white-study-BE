@@ -5,7 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import teamprojects.demo.entity.StoreItem;
 
-public interface StoreItemRepository extends JpaRepository<StoreItem, Long> {
+public interface StoreItemRepository extends JpaRepository<StoreItem, Integer> {
 
     // (API 6-1: 상점 목록 '전체' 페이징 조회 시)
     // (Service에서 isActive=true인 것만 필터링)

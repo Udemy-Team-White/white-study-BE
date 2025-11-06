@@ -9,7 +9,7 @@ import teamprojects.demo.entity.UserProfile;
 @AllArgsConstructor // (Service에서 DTO를 쉽게 생성하기 위해)
 public class RegisterResponseDto {
 
-    private Long userId;
+    private Integer userId;
     private String username;
 
     // (Service에서 User와 UserProfile을 받아 DTO를 생성할 때 사용할 정적 팩토리 메서드)

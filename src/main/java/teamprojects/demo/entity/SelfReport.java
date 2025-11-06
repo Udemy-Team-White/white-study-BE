@@ -18,7 +18,7 @@ public class SelfReport {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "report_id", nullable = false)
-    private Long id;
+    private Integer id;
 
     @Column(name = "subject", nullable = false, length = 100)
     private String subject;

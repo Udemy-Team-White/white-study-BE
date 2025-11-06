@@ -20,7 +20,7 @@ public class StudyMember {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "study_member_id", nullable = false)
-    private Long id;
+    private Integer id;
 
     @Column(name = "role", nullable = false, length = 50)
     private String role;

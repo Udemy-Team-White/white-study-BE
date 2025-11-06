@@ -19,7 +19,7 @@ public class Schedule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "schedule_id", nullable = false)
-    private Long id;
+    private Integer id;
 
     // (⭐️핵심) ENUM 타입 매핑
     @Enumerated(EnumType.STRING) // (DB에 0,1이 아닌 'Mon', 'Tue' 문자열로 저장)

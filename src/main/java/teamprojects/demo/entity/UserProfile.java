@@ -18,7 +18,7 @@ public class UserProfile {
 
     @Id
     @Column(name = "user_id")
-    private Long id;
+    private Integer id;
 
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)

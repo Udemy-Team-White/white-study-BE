@@ -6,7 +6,7 @@ import teamprojects.demo.entity.TodoList;
 
 import java.util.List;
 
-public interface TodoItemRepository extends JpaRepository<TodoItem, Long> {
+public interface TodoItemRepository extends JpaRepository<TodoItem, Integer> {
 
     // (API 5-2: TodoList에 속한 모든 Item을 조회할 때 사용)
     List<TodoItem> findByTodoListOrderByOrderIndexAsc(TodoList todoList);

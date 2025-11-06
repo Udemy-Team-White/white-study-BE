@@ -4,7 +4,7 @@ spring:
   # 1. DB ?? ??
   datasource:
     # URL: 'team_project_db'? ?? "Forward Engineer"? ??? ?? ??? ?????.
-    url: jdbc:mysql://localhost:3306/team_project_db?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/team_project_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: Study1234! # (??? ? ??? ???? DB ????)
     driver-class-name: com.mysql.cj.jdbc.Driver

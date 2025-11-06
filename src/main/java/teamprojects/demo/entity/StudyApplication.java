@@ -21,7 +21,7 @@ public class StudyApplication {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "application_id", nullable = false)
-    private Long id;
+    private Integer id;
 
     @Column(name = "message", length = 500)
     private String message;

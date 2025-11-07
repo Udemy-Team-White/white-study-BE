@@ -37,6 +37,10 @@ public class UserService {
             // 이미 사용 중인 이메일일 경우, 409 Conflict 에러 발생
             throw new CustomException(ErrorStatus.EMAIL_ALREADY_EXISTS);
         }
+        if (userRepository.existsByUsername(request.getUsername())) {
+            // (ErrorStatus에 USERNAME_ALREADY_EXISTS Enum 값을 추가했다고 가정합니다)
+            throw new CustomException(ErrorStatus.USERNAME_ALREADY_EXISTS);
+        }
 
         // 2. Salt (랜덤 UUID) 생성 (ERD의 salt 컬럼에 저장할 값)
         String salt = UUID.randomUUID().toString();

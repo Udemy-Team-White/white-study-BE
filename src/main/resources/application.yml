@@ -1,18 +1,26 @@
 spring:
-  # 1. DB 접속 설정
+  # 1. DB 접속 설정 (⭐️ AWS RDS 정보로 수정)
   datasource:
-    # (⭐️수정됨) allowPublicKeyRetrieval=true 추가
-    url: jdbc:mysql://localhost:3306/team_project_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root
-    password: Study1234!
+    # ⭐️ 1. url 변경: localhost -> RDS 엔드포인트 주소
+    # (주의: RDS에 생성한 DB 이름이 team_project_db가 맞는지 확인하세요!)
+    url: jdbc:mysql://whitestudydb.cpckamguw5kr.ap-northeast-2.rds.amazonaws.com:3306/team_project_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+
+    # ⭐️ 2. username 변경: root -> RDS 마스터 ID
+    username: whiteStudy
+
+    # ⭐️ 3. password 변경: 로컬 비밀번호 -> RDS 마스터 비밀번호
+    password: JhgdLkhzgjUtKhDwTIqB
+
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   # 2. JPA (ORM) 설정
   jpa:
     hibernate:
-      # (⭐️수정됨) "update" -> "create"
-      # DB를 싹 밀고, 님이 'Integer'로 작성한 Java 엔티티 기준으로 DB를 새로 짓습니다.
-      ddl-auto: none
+      # ⭐️⭐️⭐️ 중요: 'none' -> 'create'로 변경 ⭐️⭐️⭐️
+      # 님의 [결정 1] 사항입니다.
+      # 새 RDS DB에 님(JPA)이 직접 테이블을 생성해야 하므로 'create'로 설정합니다.
+      # (서버 최초 실행 시 테이블 16개가 자동 생성됩니다.)
+      ddl-auto: validate
     properties:
       hibernate:
         # (JPA가 실행하는 SQL 쿼리문을 콘솔에 예쁘게 보여줌)

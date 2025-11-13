@@ -2,8 +2,7 @@ package teamprojects.demo.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
@@ -13,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "STUDY")
@@ -27,8 +28,9 @@ public class Study {
     @Column(name = "study_name", length = 50)
     private String studyName;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "study_type", nullable = false, length = 50)
-    private String studyType;
+    private StudyType studyType;
 
     @Column(name = "title", nullable = false, length = 100)
     private String title;
@@ -39,8 +41,9 @@ public class Study {
     @Column(name = "max_members", nullable = false)
     private Integer maxMembers;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private String status;
+    private StudyStatus status;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -64,28 +67,32 @@ public class Study {
     private User leader;
 
     @OneToMany(mappedBy = "study", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default // 빌더 패턴 사용 시 초기화 유지
     private List<StudyHasCategory> categoryMappings = new ArrayList<>();
 
     @OneToMany(mappedBy = "study", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default // 빌더 패턴 사용 시 초기화 유지
     private List<StudyMember> studyMembers = new ArrayList<>();
 
 
-    @Builder
-    public Study(User leader, String studyName, String studyType, String title,
-                 String content, Integer maxMembers, String status,
-                 LocalDateTime closedAt, LocalDateTime startDate,
-                 LocalDateTime endDate, String todoCycle) {
+    // 1. 스터디 진행 방식 Enum (studyType 필드에서 사용)
+    public enum StudyType {
+        ONLINE,      // 온라인
+        OFFLINE,     // 오프라인
+        MIXED        // 온/오프라인 혼합
+    }
 
-        this.leader = leader;
-        this.studyName = studyName;
-        this.studyType = studyType;
-        this.title = title;
-        this.content = content;
-        this.maxMembers = maxMembers;
-        this.status = status;
-        this.closedAt = closedAt;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.todoCycle = todoCycle;
+    // 2. 스터디 모집 상태 Enum (status 필드에서 사용)
+    public enum StudyStatus {
+        RECRUITING,          // 모집 중
+        RECRUITMENT_CLOSED,  // 모집 마감 (모집 인원 도달 또는 마감일 초과)
+        IN_PROGRESS,         // 스터디 진행 중 (선택적)
+        FINISHED             // 스터디 종료 (선택적)
+    }
+
+    // 3. (참고) StudyMember 엔티티에서 사용될 Enum (스터디장 등록 시 필요)
+    public enum StudyRole {
+        LEADER,     // 스터디장
+        MEMBER      // 일반 멤버
     }
 }

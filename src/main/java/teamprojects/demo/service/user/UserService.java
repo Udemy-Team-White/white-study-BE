@@ -97,4 +97,12 @@ public class UserService {
                 .isAvailable(!isUsed)
                 .build();
     }
+    //API 1-4
+    public AuthCheckEmailResponse checkUsernameAvailability(String username) {
+        boolean isUsed = userRepository.existsByUsername(username);
+
+        return AuthCheckEmailResponse.builder()
+                .isAvailable(!isUsed)
+                .build();
+    }
 }

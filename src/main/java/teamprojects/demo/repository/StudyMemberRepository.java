@@ -10,6 +10,9 @@ import java.util.Optional;
 
 public interface StudyMemberRepository extends JpaRepository<StudyMember, Integer> {
 
+    //API 1-5
+    Integer countByStudy(Study study);
+
     // (API 3-4: 스터디의 확정 멤버 목록 조회 시 사용)
     List<StudyMember> findByStudy(Study study);
 

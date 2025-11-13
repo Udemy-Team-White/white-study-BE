@@ -87,4 +87,27 @@ public class AuthController {
         // 3. isAvailable이 true (사용 가능)일 경우, 200 OK 응답을 반환합니다.
         return ApiResponse.onSuccess(responseDto);
     }
+    /**
+     * API 1-4: 닉네임 중복 확인 요청
+     * @param username (Query Parameter로 전송)
+     * @return 200 OK (isAvailable: true/false) 또는 409 Conflict (isAvailable: false일 때)
+     */
+    @PostMapping("/check-username") // POST /api/auth/check-username?username=...
+    public ApiResponse<AuthCheckEmailResponse> checkUsernameAvailability(
+            @RequestParam @NotBlank String username) { // ⭐️ @Email은 닉네임에 필요 없으므로 제거
+
+        // 1. UserService의 중복 확인 로직 호출 (사용 가능 여부 반환)
+        AuthCheckEmailResponse responseDto = userService.checkUsernameAvailability(username);
+
+        // 2. 응답 분기 처리 (409 Conflict 처리)
+        if (!responseDto.isAvailable()) {
+            // isAvailable이 false (사용 중)일 경우, 409 Conflict를 던집니다.
+            // GlobalExceptionHandler가 이를 가로채서 409 응답 JSON으로 변환합니다.
+            throw new CustomException(ErrorStatus.USERNAME_ALREADY_EXISTS);
+            // ⭐️ (참고: API 1-1의 USERNAME_ALREADY_EXISTS를 재사용합니다.)
+        }
+
+        // 3. isAvailable이 true (사용 가능)일 경우, 200 OK 응답을 반환합니다.
+        return ApiResponse.onSuccess(responseDto);
+    }
 }

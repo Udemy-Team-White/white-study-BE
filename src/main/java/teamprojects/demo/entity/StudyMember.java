@@ -2,9 +2,7 @@ package teamprojects.demo.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
 
@@ -12,6 +10,8 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+@AllArgsConstructor
 @Entity
 @Table(name = "STUDY_MEMBER")
 @DynamicInsert
@@ -22,13 +22,13 @@ public class StudyMember {
     @Column(name = "study_member_id", nullable = false)
     private Integer id;
 
+    @Enumerated(EnumType.STRING) // DB에는 "LEADER", "MEMBER" 문자열로 저장됨
     @Column(name = "role", nullable = false, length = 50)
-    private String role;
+    private StudyRole role;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
 
     @Column(name = "left_at")
     private LocalDateTime leftAt;
@@ -43,10 +43,8 @@ public class StudyMember {
     private User user;
 
 
-    @Builder
-    public StudyMember(Study study, User user, String role) {
-        this.study = study;
-        this.user = user;
-        this.role = role;
+    public enum StudyRole {
+        LEADER,     // 스터디장
+        MEMBER      // 일반 멤버
     }
 }

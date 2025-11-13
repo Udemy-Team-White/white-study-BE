@@ -4,11 +4,17 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import teamprojects.demo.entity.Study;
 import teamprojects.demo.entity.StudyApplication;
 import teamprojects.demo.entity.User;
-
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
 public interface StudyApplicationRepository extends JpaRepository<StudyApplication, Integer> {
+
+    // ⭐️ 1. 이 메서드를 추가해야 UserService.login이 정상 작동합니다.
+    // ⭐️ (로그인 시, 스터디장(Leader)에게 온 'PENDING' 상태의 신청 건수를 조회)
+    @Query("SELECT COUNT(sa) FROM StudyApplication sa JOIN sa.study s WHERE s.leader.id = :leaderId AND sa.status = 'PENDING'")
+    Integer countPendingApplicationsByLeaderId(@Param("leaderId") Integer leaderId);
 
     // (API 3-1: 신청자 목록 조회 시 사용)
     List<StudyApplication> findByStudyAndStatus(Study study, String status);

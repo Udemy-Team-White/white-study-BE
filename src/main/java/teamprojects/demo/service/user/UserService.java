@@ -2,6 +2,7 @@ package teamprojects.demo.service.user;
 
 import teamprojects.demo.dto.auth.AuthRegisterRequest;
 import teamprojects.demo.entity.User;
+import teamprojects.demo.entity.UserProfile;
 import teamprojects.demo.global.common.code.status.ErrorStatus;
 import teamprojects.demo.global.common.exception.CustomException;
 import teamprojects.demo.repository.UserRepository;
@@ -9,7 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import teamprojects.demo.repository.StudyApplicationRepository;
+import teamprojects.demo.repository.UserProfileRepository;
+import teamprojects.demo.dto.auth.AuthLoginRequest;
+import teamprojects.demo.dto.auth.AuthLoginResponse;
 import java.util.UUID; //Salt 생성을 위해 UUID import
 
 
@@ -24,6 +28,8 @@ public class UserService {
     // 비밀번호 암호화를 위한 PasswordEncoder 의존성 주입
     private final PasswordEncoder passwordEncoder;
 
+    private final UserProfileRepository userProfileRepository;
+    private final StudyApplicationRepository studyApplicationRepository;
     /**
      * 회원 가입 로직 (API 1-1)
      * @param request (email, password, username)
@@ -53,5 +59,30 @@ public class UserService {
 
         // 5. DB에 저장 (save)
         return userRepository.save(newUser);
+    }
+    public AuthLoginResponse login(AuthLoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new CustomException(ErrorStatus.LOGIN_FAILED));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new CustomException(ErrorStatus.LOGIN_FAILED);
+        }
+
+        UserProfile userProfile = userProfileRepository.findByUser(user)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        Integer requestCount = studyApplicationRepository.countPendingApplicationsByLeaderId(user.getId());
+
+        String accessToken = "eyJhbGciOiJI...";
+
+        return AuthLoginResponse.builder()
+                .accessToken(accessToken)
+                .userProfile(AuthLoginResponse.UserProfileDto.builder()
+                        .username(user.getUsername())
+                        .points(userProfile.getPoints())
+                        .reliabilityScore(userProfile.getReliabilityScore())
+                        .studyRequestCount(requestCount)
+                        .build())
+                .build();
     }
 }

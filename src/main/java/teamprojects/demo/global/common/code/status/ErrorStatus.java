@@ -15,8 +15,9 @@ public enum ErrorStatus implements BaseErrorCode {
 
     // --- 회원가입(API 1-1) 관련 에러 ---
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, 409, "이미 사용 중인 이메일입니다."),
-    USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, 409, "이미 사용 중인 닉네임입니다."); // ⭐️ 세미콜론(;) 확인
+    USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, 409, "이미 사용 중인 닉네임입니다."), // ⭐️ 세미콜론(;) 확인
 
+    LOGIN_FAILED(HttpStatus.UNAUTHORIZED, 401, "이메일 또는 비밀번호가 올바르지 않습니다.");
     // === 필드 3개 ===
     private final HttpStatus httpStatus;
 

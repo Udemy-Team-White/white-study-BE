@@ -1,5 +1,7 @@
 package teamprojects.demo.controller.auth;
 
+import teamprojects.demo.dto.auth.AuthLoginRequest;
+import teamprojects.demo.dto.auth.AuthLoginResponse;
 import teamprojects.demo.dto.auth.AuthRegisterRequest;
 import teamprojects.demo.dto.auth.AuthRegisterResponse;
 import teamprojects.demo.entity.User;
@@ -38,5 +40,20 @@ public class AuthController {
 
         // 3. ApiResponse.onCreated()를 사용하여 201 응답 반환
         return ApiResponse.onCreated(responseDto);
+    }
+    /**
+     * API 1-2: 로그인 인증 요청
+     * * 응답:
+     * - 200 OK (AuthLoginResponse 포함)
+     * - 401 Unauthorized (UserService에서 처리)
+     */
+    @PostMapping("/login") // POST /api/auth/login
+    public ApiResponse<AuthLoginResponse> login(@Valid @RequestBody AuthLoginRequest request) {
+
+        // 1. UserService의 login 메서드 호출 (인증, 토큰 생성, 프로필 조회 로직 포함)
+        AuthLoginResponse responseDto = userService.login(request);
+
+        // 2. ApiResponse.onSuccess()를 사용하여 200 OK 응답 반환
+        return ApiResponse.onSuccess(responseDto);
     }
 }

@@ -1,5 +1,9 @@
 package teamprojects.demo.config; // 님의 패키지 경로
 
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -42,6 +46,27 @@ public class SecurityConfig {
         // (나중에 [Phase 2]에서 JWT 필터를 여기에 추가하게 됩니다)
 
         return http.build();
+    }
+    // ⭐️ 3. CORS 설정을 위한 Bean을 SecurityConfig 클래스 "내부"에 추가합니다.
+    // (passwordEncoder Bean과 같은 레벨)
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // ⭐️ (개발 중) 모든 출처(Origin)를 허용합니다.
+        configuration.setAllowedOrigins(Arrays.asList("*"));
+        // ⭐️ 모든 HTTP 메서드 (GET, POST, PUT, DELETE 등)를 허용합니다.
+        configuration.setAllowedMethods(Arrays.asList("*"));
+        // ⭐️ 모든 헤더를 허용합니다.
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+
+        // (필요 시 주석 해제)
+        // configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // ⭐️ "/**" (모든 경로)에 대해 위 설정을 적용합니다.
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     // 비밀번호 암호화도구를 Bean으로 등록

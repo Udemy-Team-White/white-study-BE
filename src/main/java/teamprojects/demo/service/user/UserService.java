@@ -14,6 +14,7 @@ import teamprojects.demo.repository.StudyApplicationRepository;
 import teamprojects.demo.repository.UserProfileRepository;
 import teamprojects.demo.dto.auth.AuthLoginRequest;
 import teamprojects.demo.dto.auth.AuthLoginResponse;
+import teamprojects.demo.dto.auth.AuthCheckEmailResponse;
 import java.util.UUID; //Salt 생성을 위해 UUID import
 
 
@@ -60,6 +61,7 @@ public class UserService {
         // 5. DB에 저장 (save)
         return userRepository.save(newUser);
     }
+    //API 1-2
     public AuthLoginResponse login(AuthLoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new CustomException(ErrorStatus.LOGIN_FAILED));
@@ -83,6 +85,16 @@ public class UserService {
                         .reliabilityScore(userProfile.getReliabilityScore())
                         .studyRequestCount(requestCount)
                         .build())
+                .build();
+    }
+    //API 1-3
+    public AuthCheckEmailResponse checkEmailAvailability(String email) {
+        boolean isUsed = userRepository.existsByEmail(email);
+
+        // API 명세서에 따라, 중복 여부(isUsed)를 반전시켜 '사용 가능 여부(!isUsed)'를 반환합니다.
+        // (409 에러 처리는 Controller에서 isAvailable이 false일 때 별도로 처리할 수 있습니다.)
+        return AuthCheckEmailResponse.builder()
+                .isAvailable(!isUsed)
                 .build();
     }
 }

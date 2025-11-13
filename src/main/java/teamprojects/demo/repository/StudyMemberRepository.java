@@ -13,6 +13,9 @@ public interface StudyMemberRepository extends JpaRepository<StudyMember, Intege
     //API 1-5
     Integer countByStudy(Study study);
 
+    // API 2-2 User와 Study 객체로 멤버 존재 여부 확인
+    boolean existsByUserAndStudy(User user, Study study);
+
     // (API 3-4: 스터디의 확정 멤버 목록 조회 시 사용)
     List<StudyMember> findByStudy(Study study);
 

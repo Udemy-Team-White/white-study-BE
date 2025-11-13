@@ -13,6 +13,11 @@ import teamprojects.demo.global.common.ApiResponse;
 import teamprojects.demo.service.study.StudyService;
 import teamprojects.demo.dto.study.StudyCreateRequest;
 import teamprojects.demo.dto.study.StudyCreateResponse;
+import teamprojects.demo.dto.study.StudyDetailResponse; // ⭐️ API 2-2 응답 DTO
+import org.springframework.web.bind.annotation.PathVariable; // ⭐️ URL 경로 변수({studyId}) 처리를 위함
+import teamprojects.demo.dto.study.StudyApplyRequest; // ⭐️ Request DTO
+import teamprojects.demo.dto.study.StudyApplyResponse;
+import jakarta.validation.constraints.NotNull;// ⭐️ Response DTO
 import jakarta.validation.Valid;
 
 
@@ -49,6 +54,41 @@ public class StudyController {
 
         // 1. StudyService의 스터디 개설 메서드 호출
         StudyCreateResponse responseDto = studyService.createStudy(request);
+
+        // 2. 201 Created 응답 반환
+        return ApiResponse.onCreated(responseDto);
+    }
+    /**
+     * API 2-2: 스터디 상세 정보 조회
+     * URL: GET /api/studies/{studyId}
+     * @param studyId (URL Path Variable)
+     * @return 200 OK (StudyDetailResponse)
+     */
+    @GetMapping("/{studyId}") // 최종 URL: /api/studies/{studyId}
+    public ApiResponse<StudyDetailResponse> getStudyDetail(@PathVariable Integer studyId) {
+
+        // 1. StudyService의 상세 조회 메서드 호출
+        StudyDetailResponse responseDto = studyService.getStudyDetail(studyId);
+
+        // 2. 200 OK 응답 반환
+        return ApiResponse.onSuccess(responseDto);
+    }
+
+    /**
+     * API 2-3: 스터디 참여 신청
+     * URL: POST /api/studies/{studyId}/apply
+     * (로그인 필요)
+     * @param studyId (URL Path Variable)
+     * @param request (신청 메시지 포함)
+     * @return 201 Created (StudyApplyResponse)
+     */
+    @PostMapping("/{studyId}/apply")
+    public ApiResponse<StudyApplyResponse> applyToStudy(
+            @PathVariable @NotNull Integer studyId,
+            @RequestBody @Valid StudyApplyRequest request) { // RequestBody 유효성 검사
+
+        // 1. StudyService의 신청 메서드 호출
+        StudyApplyResponse responseDto = studyService.applyToStudy(studyId, request);
 
         // 2. 201 Created 응답 반환
         return ApiResponse.onCreated(responseDto);

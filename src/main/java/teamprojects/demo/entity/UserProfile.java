@@ -1,16 +1,15 @@
 package teamprojects.demo.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "USER_PROFILE")
@@ -35,11 +34,13 @@ public class UserProfile {
     @Column(name = "introduction", length = 500)
     private String introduction;
 
+    @Builder.Default
     @Column(name = "points", nullable = false)
-    private Integer points;
+    private Integer points = 0;
 
+    @Builder.Default
     @Column(name = "reliability_score", nullable = false)
-    private Integer reliabilityScore;
+    private Integer reliabilityScore = 50;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -49,15 +50,6 @@ public class UserProfile {
     @Column(name = "last_login", nullable = false)
     private LocalDateTime lastLogin;
 
-    @Builder
-    public UserProfile(User user, String username, String profileImageUrl, String introduction, Integer points, Integer reliabilityScore) {
-        this.user = user;
-        this.username = username;
-        this.profileImageUrl = profileImageUrl;
-        this.introduction = introduction;
-        this.points = (points != null) ? points : 0;
-        this.reliabilityScore = (reliabilityScore != null) ? reliabilityScore : 50;
-    }
 
     public void setUser(User user) {
         this.user = user;

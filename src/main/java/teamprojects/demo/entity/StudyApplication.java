@@ -1,10 +1,7 @@
 package teamprojects.demo.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -12,6 +9,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "STUDY_APPLICATION")
@@ -26,8 +25,10 @@ public class StudyApplication {
     @Column(name = "message", length = 500)
     private String message;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private String status;
+    @Builder.Default // 빌더 사용 시 값 안 넣으면 자동으로 PENDING 설정
+    private ApplicationStatus status = ApplicationStatus.PENDING;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -47,11 +48,9 @@ public class StudyApplication {
     @JoinColumn(name = "user_id")
     private User user;
 
-
-    @Builder
-    public StudyApplication(Study study, User user, String message) {
-        this.study = study;
-        this.user = user;
-        this.message = message;
+    public enum ApplicationStatus {
+        PENDING,    // 승인 대기
+        APPROVED,   // 승인됨
+        REJECTED    // 거절됨
     }
 }

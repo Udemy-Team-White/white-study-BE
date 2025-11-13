@@ -16,13 +16,20 @@ public enum ErrorStatus implements BaseErrorCode {
     // --- 회원가입(API 1-1) 관련 에러 ---
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, 409, "이미 사용 중인 이메일입니다."),
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, 409, "이미 사용 중인 닉네임입니다."), // ⭐️ 세미콜론(;) 확인
+    // 3. 이미 멤버이거나 신청 대기 중일 때 (409 Conflict)
+    ALREADY_MEMBER_OR_APPLIED(HttpStatus.CONFLICT, 409, "이미 신청했거나 참여 중인 스터디입니다."),
+
 
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, 401, "이메일 또는 비밀번호가 올바르지 않습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, 401, "로그인 후 다시 시도해 주십시오."),
 
     // ⭐️ 2. 유효성 검사 실패 (카테고리 ID 등 잘못된 데이터, 400 Bad Request)
-    CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, 400, "요청한 카테고리 ID가 존재하지 않습니다.");
+    CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, 400, "요청한 카테고리 ID가 존재하지 않습니다."),
+    // 2. 모집 마감된 스터디에 신청 시도 (400 Bad Request)
+    RECRUITMENT_CLOSED(HttpStatus.BAD_REQUEST, 400, "모집이 마감된 스터디입니다."),
 
+    // 스터디가 없을 때 404 에러
+    STUDY_NOT_FOUND(HttpStatus.NOT_FOUND, 404, "해당 스터디를 찾을 수 없습니다.");
     // === 필드 3개 ===
     private final HttpStatus httpStatus;
 

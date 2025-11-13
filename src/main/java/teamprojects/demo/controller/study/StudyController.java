@@ -13,12 +13,18 @@ import teamprojects.demo.global.common.ApiResponse;
 import teamprojects.demo.service.study.StudyService;
 import teamprojects.demo.dto.study.StudyCreateRequest;
 import teamprojects.demo.dto.study.StudyCreateResponse;
-import teamprojects.demo.dto.study.StudyDetailResponse; // ⭐️ API 2-2 응답 DTO
-import org.springframework.web.bind.annotation.PathVariable; // ⭐️ URL 경로 변수({studyId}) 처리를 위함
-import teamprojects.demo.dto.study.StudyApplyRequest; // ⭐️ Request DTO
+import teamprojects.demo.dto.study.StudyDetailResponse;
+import org.springframework.web.bind.annotation.PathVariable;
+import teamprojects.demo.dto.study.StudyApplyRequest;
 import teamprojects.demo.dto.study.StudyApplyResponse;
-import jakarta.validation.constraints.NotNull;// ⭐️ Response DTO
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.Valid;
+import teamprojects.demo.dto.study.TodoPlannerResponse;
+import java.time.LocalDate;
+import java.util.List;
+import org.springframework.web.bind.annotation.RequestParam;
+import teamprojects.demo.dto.study.TodoListCreateRequest;
+import teamprojects.demo.dto.study.TodoListCreateResponse;
 
 
 @RestController // ⭐️ REST API 컨트롤러
@@ -89,6 +95,44 @@ public class StudyController {
 
         // 1. StudyService의 신청 메서드 호출
         StudyApplyResponse responseDto = studyService.applyToStudy(studyId, request);
+
+        // 2. 201 Created 응답 반환
+        return ApiResponse.onCreated(responseDto);
+    }
+    /**
+     * API 3-2: TODO 플래너 조회 (날짜별)
+     * URL: GET /api/studies/{studyId}/todos?date=YYYY-MM-DD
+     * (로그인 필요)
+     * @param studyId (Path Variable)
+     * @param date (Query Parameter, YYYY-MM-DD 형식)
+     * @return 200 OK (List<TodoPlannerResponse>)
+     */
+    @GetMapping("/{studyId}/todos")
+    public ApiResponse<List<TodoPlannerResponse>> getStudyTodos(
+            @PathVariable Integer studyId,
+            @RequestParam LocalDate date) { // ⭐️ String "YYYY-MM-DD"가 자동으로 LocalDate로 변환됩니다.
+
+        // 1. StudyService 호출
+        List<TodoPlannerResponse> responseDto = studyService.getStudyTodos(studyId, date);
+
+        // 2. 200 OK 응답 반환
+        return ApiResponse.onSuccess(responseDto);
+    }
+    /**
+     * API 3-3: TODO 플래너(그룹) 생성
+     * URL: POST /api/studies/{studyId}/todo-lists
+     * (로그인 필요, 스터디 멤버만 가능)
+     * @param studyId (Path Variable)
+     * @param request (JSON Body: targetDate, title)
+     * @return 201 Created (TodoListCreateResponse)
+     */
+    @PostMapping("/{studyId}/todo-lists")
+    public ApiResponse<TodoListCreateResponse> createTodoList(
+            @PathVariable Integer studyId,
+            @Valid @RequestBody TodoListCreateRequest request) {
+
+        // 1. StudyService의 생성 메서드 호출
+        TodoListCreateResponse responseDto = studyService.createTodoList(studyId, request);
 
         // 2. 201 Created 응답 반환
         return ApiResponse.onCreated(responseDto);

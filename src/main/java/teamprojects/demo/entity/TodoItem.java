@@ -2,9 +2,7 @@ package teamprojects.demo.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicInsert;
 
@@ -13,6 +11,8 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
+@Builder
+@AllArgsConstructor
 @Table(name = "TODO_ITEM")
 @DynamicInsert
 public class TodoItem {
@@ -26,7 +26,8 @@ public class TodoItem {
     private String content;
 
     @Column(name = "is_completed", nullable = false)
-    private Boolean isCompleted;
+    @Builder.Default
+    private Boolean isCompleted = false;
 
     @Column(name = "order_index", nullable = false)
     private Integer orderIndex;
@@ -39,11 +40,4 @@ public class TodoItem {
     @JoinColumn(name = "todo_list_id")
     private TodoList todoList;
 
-
-    @Builder
-    public TodoItem(TodoList todoList, String content, Integer orderIndex) {
-        this.todoList = todoList;
-        this.content = content;
-        this.orderIndex = orderIndex;
-    }
 }

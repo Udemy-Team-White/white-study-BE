@@ -16,6 +16,12 @@ import teamprojects.demo.dto.auth.AuthLoginRequest;
 import teamprojects.demo.dto.auth.AuthLoginResponse;
 import teamprojects.demo.dto.auth.AuthCheckEmailResponse;
 import java.util.UUID; //Salt 생성을 위해 UUID import
+import java.util.List;
+import teamprojects.demo.dto.user.MypageDataResponse; // ⭐️ 에러 3 해결
+import teamprojects.demo.entity.Study; // ⭐️ 에러 6 해결
+import teamprojects.demo.global.utils.SecurityUtils; // ⭐️ 에러 4 해결
+import teamprojects.demo.repository.StudyMemberRepository;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -29,6 +35,7 @@ public class UserService {
     // 비밀번호 암호화를 위한 PasswordEncoder 의존성 주입
     private final PasswordEncoder passwordEncoder;
 
+    private final StudyMemberRepository studyMemberRepository;
     private final UserProfileRepository userProfileRepository;
     private final StudyApplicationRepository studyApplicationRepository;
     /**
@@ -103,6 +110,84 @@ public class UserService {
 
         return AuthCheckEmailResponse.builder()
                 .isAvailable(!isUsed)
+                .build();
+    }
+
+    /**
+     * API 3-1: 마이페이지 초기 데이터 조회
+     */
+    public MypageDataResponse getUserMypageData() {
+
+        // 1. 로그인 사용자 확인 (401 Unauthorized)
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        UserProfile userProfile = userProfileRepository.findByUser(currentUser)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        // 2. Profile Info
+        MypageDataResponse.ProfileInfoDto profileInfo = MypageDataResponse.ProfileInfoDto.builder()
+                .username(userProfile.getUsername())
+                .email(currentUser.getEmail()) // User 엔티티에 email 필드가 있다고 가정
+                .bio(userProfile.getIntroduction())
+                .imgUrl(userProfile.getProfileImageUrl())
+                .build();
+
+        // 3. Activity Summary
+
+        // 3-1. 진행 중/완료 스터디 수 조회
+        // ⭐️ [필수] StudyStatus Enum은 Study 엔티티에 있다고 가정합니다.
+        long inProgressCount = studyMemberRepository.countByUserAndStudyStatusIn(
+                currentUser,
+                List.of(Study.StudyStatus.RECRUITING, Study.StudyStatus.IN_PROGRESS)
+        );
+
+        long completedCount = studyMemberRepository.countByUserAndStudyStatusIn(
+                currentUser,
+                List.of(Study.StudyStatus.FINISHED, Study.StudyStatus.RECRUITMENT_CLOSED)
+        );
+
+        // 3-2. 칭찬 요약 (⭐️ [가정] PraiseRepository를 사용한다고 가정합니다.)
+        // 실제 구현 시에는 PraiseRepository에 사용자 정의 쿼리(GROUP BY message)가 필요합니다.
+        List<MypageDataResponse.PraiseDto> praiseDtos = List.of(); // 임시로 빈 목록 반환
+        /*
+        List<MypageDataResponse.PraiseDto> praiseDtos = praiseRepository.findTopPraiseSummaryByUser(currentUser).stream()
+                .map(praiseResult -> MypageDataResponse.PraiseDto.builder()
+                        .message((String) praiseResult[0])
+                        .count(((Long) praiseResult[1]).intValue())
+                        .build())
+                .collect(Collectors.toList());
+        */
+
+        MypageDataResponse.ActivitySummaryDto activitySummary = MypageDataResponse.ActivitySummaryDto.builder()
+                .points(userProfile.getPoints())
+                .reliabilityScore(userProfile.getReliabilityScore())
+                .praise(praiseDtos)
+                .inProgressStudies((int) inProgressCount)
+                .completedStudies((int) completedCount)
+                .build();
+
+        // 4. Inventory Summary (⭐️ [가정] UserInventoryRepository를 사용한다고 가정합니다.)
+        // 실제 구현 시에는 UserInventory 엔티티에 Item 엔티티가 연결되어 있어야 합니다.
+        List<MypageDataResponse.InventorySummaryDto> inventorySummary = List.of(); // 임시로 빈 목록 반환
+        /*
+        List<MypageDataResponse.InventorySummaryDto> inventorySummary = userInventoryRepository.findByUser(currentUser).stream()
+                .map(userInventory -> MypageDataResponse.InventorySummaryDto.builder()
+                        .itemId(userInventory.getItem().getId())
+                        .itemName(userInventory.getItem().getName())
+                        .equipped(userInventory.isEquipped()) // isEquipped 필드 가정
+                        .build())
+                .collect(Collectors.toList());
+        */
+
+        // 5. 최종 응답 조립
+        return MypageDataResponse.builder()
+                .profileInfo(profileInfo)
+                .activitySummary(activitySummary)
+                .inventorySummary(inventorySummary)
                 .build();
     }
 }

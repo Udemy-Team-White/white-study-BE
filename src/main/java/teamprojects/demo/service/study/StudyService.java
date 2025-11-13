@@ -17,24 +17,25 @@ import teamprojects.demo.entity.StudyCategory;
 import teamprojects.demo.entity.StudyHasCategory;
 import teamprojects.demo.entity.StudyMember;
 import teamprojects.demo.entity.User;
+import teamprojects.demo.entity.TodoList;
 import teamprojects.demo.global.common.code.status.ErrorStatus;
 import teamprojects.demo.global.common.exception.CustomException;
 import teamprojects.demo.global.utils.SecurityUtils;
-import teamprojects.demo.repository.StudyCategoryRepository;
-import teamprojects.demo.repository.StudyHasCategoryRepository;
-import teamprojects.demo.repository.StudyMemberRepository;
-import teamprojects.demo.repository.StudyRepository;
-import teamprojects.demo.repository.UserRepository;
-import teamprojects.demo.entity.UserProfile; // 에러 4 해결
-import teamprojects.demo.repository.UserProfileRepository; // 에러 1 해결
-import teamprojects.demo.repository.StudyApplicationRepository; // 에러 2 해결
-import teamprojects.demo.dto.study.StudyDetailResponse; // 에러 3 해결
-import teamprojects.demo.dto.study.StudyApplyRequest;   // 에러 2, 4 해결
-import teamprojects.demo.dto.study.StudyApplyResponse;  // 에러 1 해결
+import teamprojects.demo.repository.*;
+import teamprojects.demo.entity.UserProfile;
+import teamprojects.demo.dto.study.StudyDetailResponse;
+import teamprojects.demo.dto.study.StudyApplyRequest;
+import teamprojects.demo.dto.study.StudyApplyResponse;
 import teamprojects.demo.entity.StudyApplication;
+import teamprojects.demo.dto.study.TodoPlannerResponse;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import teamprojects.demo.dto.study.TodoListCreateRequest;
+import teamprojects.demo.dto.study.TodoListCreateResponse;
+import teamprojects.demo.repository.TodoListRepository;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +49,7 @@ public class StudyService {
     private final StudyCategoryRepository studyCategoryRepository;
     private final UserProfileRepository userProfileRepository; // ⭐️ 스터디장 신뢰도 조회용
     private final StudyApplicationRepository studyApplicationRepository; // ⭐️ 신청 상태 조회용
-
+    private final TodoListRepository todoListRepository;
     /**
      * API 1-5: 스터디 목록 조회
      */
@@ -285,6 +286,97 @@ public class StudyService {
         return StudyApplyResponse.builder()
                 .applicationId(newApplication.getId())
                 .status(newApplication.getStatus().name())
+                .build();
+    }
+    /**
+     * API 3-2: TODO 플래너 조회 (날짜별)
+     * 님의 TodoListRepository 메서드(Between)에 맞춰 수정되었습니다.
+     */
+    @Transactional(readOnly = true)
+    public List<TodoPlannerResponse> getStudyTodos(Integer studyId, LocalDate targetDate) {
+
+        // 1. 현재 사용자 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        // 2. 스터디 확인
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 멤버 자격 확인
+        if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
+            throw new CustomException(ErrorStatus.STUDY_NOT_FOUND); // 또는 403 Forbidden
+        }
+
+        // 4. ⭐️ [수정됨] 날짜 범위 계산 (LocalDate -> LocalDateTime Start/End)
+        // 예: 2025-11-15 -> 2025-11-15 00:00:00 ~ 2025-11-15 23:59:59
+        LocalDateTime startOfDay = targetDate.atStartOfDay();
+        LocalDateTime endOfDay = targetDate.atTime(23, 59, 59);
+
+        // 5. ⭐️ [수정됨] Repository 호출 (파라미터 순서: User, Study, Start, End)
+        List<TodoList> todoLists = todoListRepository.findByUserAndStudyAndTargetDateBetween(
+                currentUser, study, startOfDay, endOfDay);
+
+        // 6. 응답 DTO 변환
+        return todoLists.stream()
+                .map(todoList -> {
+                    // ⭐️ [수정] getItems() -> getTodoItems() 로 변경!
+                    List<TodoPlannerResponse.TodoItemDto> itemDtos = todoList.getTodoItems().stream()
+                            .map(todoItem -> TodoPlannerResponse.TodoItemDto.builder()
+                                    .todoItemId(todoItem.getId())
+                                    .content(todoItem.getContent())
+                                    .isCompleted(todoItem.getIsCompleted()) // (참고: TodoItem 엔티티 필드명 확인 필요)
+                                    .build())
+                            .collect(Collectors.toList());
+
+                    return TodoPlannerResponse.builder()
+                            .todoListId(todoList.getId())
+                            .title(todoList.getTitle())
+                            .items(itemDtos)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+    @Transactional
+    public TodoListCreateResponse createTodoList(Integer studyId, TodoListCreateRequest request) {
+
+        // 1. 현재 로그인 사용자 확인 (401 Unauthorized)
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        // 2. 스터디 존재 확인 (404)
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 스터디 멤버 자격 확인 (404/403 - 멤버만 TODO를 생성할 수 있음)
+        // ⭐️ StudyMemberRepository에 existsByUserAndStudy 메서드가 있어야 합니다.
+        if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
+            // 멤버가 아니면 404를 반환하여 권한 없음/정보 없음으로 처리합니다.
+            throw new CustomException(ErrorStatus.STUDY_NOT_FOUND);
+        }
+
+        // 4. TodoList Entity 생성 및 저장
+        TodoList newTodoList = TodoList.builder()
+                .study(study)
+                .user(currentUser)
+                .title(request.getTitle()) // Optional 제목
+                .targetDate(request.getTargetDate()) // 필수 날짜
+                .build();
+
+        newTodoList = todoListRepository.save(newTodoList);
+
+        // 5. 응답 DTO 반환 (빈 items 리스트와 함께 반환)
+        return TodoListCreateResponse.builder()
+                .todoListId(newTodoList.getId())
+                .title(newTodoList.getTitle())
+                .targetDate(newTodoList.getTargetDate())
+                .items(new ArrayList<>()) // 생성 시에는 항상 빈 목록 반환
                 .build();
     }
 }

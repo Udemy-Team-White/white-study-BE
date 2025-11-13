@@ -38,4 +38,7 @@ public class ApiResponse<T> {
     public static <T> ApiResponse<T> onFailure(int code, String message) {
         return new ApiResponse<>(code, message, null);
     }
+    public static <T> ApiResponse<T> onCreated(T data, String message) {
+        return new ApiResponse<>(201, message, data);
+    }
 }

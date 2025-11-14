@@ -9,8 +9,12 @@ import teamprojects.demo.entity.User;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
 
 public interface SelfReportRepository extends JpaRepository<SelfReport, Integer> {
+
+    // ⭐️ API 4-1: 대시보드에서 최근 보고서 3개를 조회할 때 사용
+    List<SelfReport> findTop3ByStudyOrderByCreatedAtDesc(Study study);
 
     // (API 5-9: 스터디의 보고서 목록 '페이지네이션' 조회 시 사용)
     Page<SelfReport> findByStudyOrderByCreatedAtDesc(Study study, Pageable pageable);

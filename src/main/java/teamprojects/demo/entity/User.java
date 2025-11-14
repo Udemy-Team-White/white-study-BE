@@ -53,4 +53,14 @@ public class User {
             userProfile.setUser(this);
         }
     }
+
+    // 닉네임 수정 (API 3-2)
+    public void updateUsername(String username) {
+        this.username = username;
+    }
+
+    // 비밀번호 수정 (API 3-2)
+    public void updatePassword(String newPassword) {
+        this.password = newPassword;
+    }
 }

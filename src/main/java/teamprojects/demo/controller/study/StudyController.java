@@ -25,13 +25,15 @@ import java.util.List;
 import org.springframework.web.bind.annotation.RequestParam;
 import teamprojects.demo.dto.study.TodoListCreateRequest;
 import teamprojects.demo.dto.study.TodoListCreateResponse;
-
+import teamprojects.demo.dto.study.StudyDashboardResponse;
+import teamprojects.demo.service.user.UserService;
 
 @RestController // ⭐️ REST API 컨트롤러
 @RequiredArgsConstructor
 @RequestMapping("/api/studies") // ⭐️ 기본 URL: /api/studies
 public class StudyController {
 
+    private final UserService userService;
     private final StudyService studyService; // ⭐️ 새로 만든 StudyService 주입
 
     /**
@@ -100,7 +102,28 @@ public class StudyController {
         return ApiResponse.onCreated(responseDto);
     }
     /**
-     * API 3-2: TODO 플래너 조회 (날짜별)
+     * API 4-1: 스터디 대시보드 초기 데이터 조회
+     * URL: GET /api/studies/{studyId}/dashboard (✅ 최종 확정 URL)
+     * @param studyId Path Variable로 전달된 스터디 ID
+     * @return 200 OK (StudyDashboardResponse)
+     */
+    @GetMapping("/{studyId}/dashboard")
+    public ApiResponse<StudyDashboardResponse> getStudyDashboardData(
+            @PathVariable("studyId") Integer studyId
+            // ⚠️ @AuthenticationPrincipal은 나중에 추가
+    ) {
+        // ⚠️ TODO: 현재는 로그인이 구현되지 않았으므로, 테스트를 위해 userId를 1로 고정합니다.
+        Integer userId = 1;
+
+        // 1. UserService의 대시보드 조회 메서드 호출
+        StudyDashboardResponse responseDto = userService.getDashboardData(studyId, userId);
+
+        // 2. 200 OK 응답 반환
+        return ApiResponse.onSuccess(responseDto, "스터디 대시보드 정보 조회 성공");
+    }
+
+    /**
+     * API 4-2: TODO 플래너 조회 (날짜별)
      * URL: GET /api/studies/{studyId}/todos?date=YYYY-MM-DD
      * (로그인 필요)
      * @param studyId (Path Variable)
@@ -119,7 +142,7 @@ public class StudyController {
         return ApiResponse.onSuccess(responseDto);
     }
     /**
-     * API 3-3: TODO 플래너(그룹) 생성
+     * API 4-3: TODO 플래너(그룹) 생성
      * URL: POST /api/studies/{studyId}/todo-lists
      * (로그인 필요, 스터디 멤버만 가능)
      * @param studyId (Path Variable)

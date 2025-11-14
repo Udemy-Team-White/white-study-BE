@@ -57,4 +57,8 @@ public class Schedule {
         this.startTime = startTime;
         this.endTime = endTime;
     }
+    // ⭐️ UserService의 컴파일 오류 해결을 위한 임시 Getter
+    public LocalTime getScheduleTime() {
+        return this.startTime;
+    }
 }

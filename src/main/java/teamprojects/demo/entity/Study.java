@@ -95,4 +95,8 @@ public class Study {
         LEADER,     // 스터디장
         MEMBER      // 일반 멤버
     }
+    public Integer getCurrentMembers() {
+        // studyMembers 리스트의 크기를 반환합니다.
+        return this.studyMembers.size();
+    }
 }

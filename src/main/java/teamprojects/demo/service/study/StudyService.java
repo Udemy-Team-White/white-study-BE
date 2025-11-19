@@ -115,11 +115,28 @@ public class StudyService {
     public StudyCreateResponse createStudy(StudyCreateRequest request) {
 
         // 1. 로그인 사용자 확인
-        Integer currentUserId = SecurityUtils.getCurrentUserId()
-                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+        // 원래 코드 (나중에 JWT 완성하면 주석 푸세요):
+        // Integer currentUserId = SecurityUtils.getCurrentUserId()
+        //        .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        Integer currentUserId = 1;
+
 
         User leader = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        // ⭐️ [Null 방어 1] studyType이 없으면 'ONLINE'으로 기본 설정
+        Study.StudyType type;
+        if (request.getStudyType() == null || request.getStudyType().isBlank()) {
+            type = Study.StudyType.ONLINE; // 기본값
+        } else {
+            try {
+                type = Study.StudyType.valueOf(request.getStudyType());
+            } catch (IllegalArgumentException e) {
+                // 이상한 글자가 들어오면 기본값으로 처리 (선택 사항)
+                type = Study.StudyType.ONLINE;
+            }
+        }
 
         // 2. 스터디 생성
         Study newStudy = Study.builder()
@@ -136,16 +153,19 @@ public class StudyService {
         newStudy = studyRepository.save(newStudy);
 
         // 3. 카테고리 연결
-        for (Integer categoryId : request.getCategoryIds()) {
-            StudyCategory category = studyCategoryRepository.findById(categoryId)
-                    .orElseThrow(() -> new CustomException(ErrorStatus.CATEGORY_NOT_FOUND));
+        // ⭐️ [방어 로직 2] 카테고리가 없어도(Null or Empty) 에러 안 나게 처리
+        if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
+            for (Integer categoryId : request.getCategoryIds()) {
+                StudyCategory category = studyCategoryRepository.findById(categoryId)
+                        .orElseThrow(() -> new CustomException(ErrorStatus.CATEGORY_NOT_FOUND));
 
-            StudyHasCategory link = StudyHasCategory.builder()
-                    .study(newStudy)
-                    .studyCategory(category)
-                    .build();
+                StudyHasCategory link = StudyHasCategory.builder()
+                        .study(newStudy)
+                        .studyCategory(category)
+                        .build();
 
-            studyHasCategoryRepository.save(link);
+                studyHasCategoryRepository.save(link);
+            }
         }
 
         // 4. 스터디장 멤버 등록
@@ -153,10 +173,6 @@ public class StudyService {
                 .study(newStudy)
                 .user(leader)
                 .role(StudyMember.StudyRole.LEADER)
-                // ⭐️ [수정 2] 필드명 불일치 해결 (created -> createdAt)
-                // 하지만 @CreationTimestamp가 엔티티에 있다면 생략해도 자동 생성됩니다.
-                // 명시적으로 넣으려면 .createdAt(LocalDateTime.now()) 라고 써야 합니다.
-                // 여기선 깔끔하게 생략하겠습니다. (엔티티가 알아서 채워줌)
                 .build();
 
         studyMemberRepository.save(leaderMember);

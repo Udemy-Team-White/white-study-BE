@@ -86,35 +86,42 @@ public class UserService {
     private final StudyApplicationRepository studyApplicationRepository;
 
     /**
-     * 회원 가입 로직 (API 1-1)
-     *
-     * @param request (email, password, username)
-     * @return User Entity (저장된 사용자 정보)
+     * 회원 가입 로직 (API 1-1) - 수정됨!
+     * 수정사항: 회원가입 시 UserProfile도 같이 생성하도록 변경
      */
-    @Transactional // 쓰기 작업이므로 @Transactional 어노테이션 추가
+    @Transactional
     public User signUp(AuthRegisterRequest request) {
 
-        // 1. 이메일 중복 확인 (UserRepository에 선언된 메서드 사용)
+        // 1. 이메일 중복 확인
         if (userRepository.existsByEmail(request.getEmail())) {
-            // 이미 사용 중인 이메일일 경우, 409 Conflict 에러 발생
             throw new CustomException(ErrorStatus.EMAIL_ALREADY_EXISTS);
         }
+        // 2. 닉네임 중복 확인
         if (userRepository.existsByUsername(request.getUsername())) {
-            // (ErrorStatus에 USERNAME_ALREADY_EXISTS Enum 값을 추가했다고 가정합니다)
             throw new CustomException(ErrorStatus.USERNAME_ALREADY_EXISTS);
         }
 
-        // 2. Salt (랜덤 UUID) 생성 (ERD의 salt 컬럼에 저장할 값)
+        // 3. Salt 생성 및 비밀번호 암호화
         String salt = UUID.randomUUID().toString();
-
-        // 3. 비밀번호 암호화 (Bcrypt 사용)
         String encodedPassword = passwordEncoder.encode(request.getPassword());
 
-        // 4. DTO를 Entity로 변환 (AuthRegisterRequest의 toEntity 메서드 사용)
+        // 4. User 엔티티 생성 및 저장
         User newUser = request.toEntity(encodedPassword, salt);
+        User savedUser = userRepository.save(newUser);
 
-        // 5. DB에 저장 (save)
-        return userRepository.save(newUser);
+        // ⭐️ 5. [여기가 추가되었습니다!] UserProfile 엔티티 자동 생성
+        // 이걸 해줘야 로그인할 때 프로필을 찾을 수 있습니다.
+        UserProfile newProfile = UserProfile.builder()
+                .user(savedUser)             // 방금 가입한 유저와 연결
+                .username(savedUser.getUsername()) // 닉네임 동일하게 설정
+                .points(0)                   // 초기 포인트 0
+                .reliabilityScore(0)         // 초기 신뢰도 0
+                .introduction("안녕하세요! 함께 공부해요.")  // 기본 자기소개
+                .build();
+
+        userProfileRepository.save(newProfile); // DB에 프로필 저장
+
+        return savedUser;
     }
 
     //API 1-2

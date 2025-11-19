@@ -21,10 +21,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // ⭐️ 1. CORS 설정 적용 (이 줄이 가장 중요합니다! 만든 규칙을 여기에 등록)
+                // 1. CORS 설정 적용
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // 2. CSRF/FormLogin/HttpBasic 비활성화
+                // 2. 보안 설정 비활성화 (CSRF, FormLogin, HttpBasic)
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -33,39 +33,37 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 4. API 접근 권한 설정
+                // 4. ⭐️ URL 접근 권한 설정 (이 부분이 핵심입니다!)
                 .authorizeHttpRequests(auth -> auth
+                        // (1) 로그인, 회원가입, 이메일체크 등 Auth 관련 모든 URL 허용
+                        .requestMatchers("/api/auth/**").permitAll()
+
+                        // (2) Swagger 관련 URL 허용
                         .requestMatchers(
-                                "/api/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
+
+                        // (3) 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 );
 
         return http.build();
     }
 
-    // ⭐️ 5. CORS 규칙 정의 (프론트엔드 팀 요청 반영)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // (1) 프론트엔드 주소 2개를 정확하게 명시 (와일드카드 * 대신 이걸 써야 Credentials 허용 가능)
+        // 프론트엔드 주소 허용
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",          // 프론트 로컬
-                "https://white-study-fe.vercel.app" // 프론트 배포
+                "http://localhost:5173",
+                "https://white-study-fe.vercel.app"
         ));
-
-        // (2) 모든 HTTP 메서드 허용
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-
-        // (3) 모든 헤더 허용
         configuration.setAllowedHeaders(Arrays.asList("*"));
-
-        // (4) 자격 증명(쿠키, 인증 헤더 등) 허용 -> 프론트엔드 로그인 구현에 필수!
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

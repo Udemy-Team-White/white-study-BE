@@ -1,4 +1,4 @@
-package teamprojects.demo.config; // 님의 패키지 경로
+package teamprojects.demo.config;
 
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -14,65 +14,67 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
-@Configuration // "이 파일은 Spring의 '설정' 파일입니다"
-@EnableWebSecurity // "Spring Security를 '활성화'합니다"
+@Configuration
+@EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. CSRF/FormLogin/HttpBasic 비활성화 (기존 코드 유지)
+                // ⭐️ 1. CORS 설정 적용 (이 줄이 가장 중요합니다! 만든 규칙을 여기에 등록)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // 2. CSRF/FormLogin/HttpBasic 비활성화
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
 
-                // 2. 세션(Session)을 사용하지 않음 (기존 코드 유지)
+                // 3. 세션 미사용 (STATELESS)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 3. ⭐️⭐️⭐️ API 및 Swagger 경로 접근 허용 (이 부분 수정) ⭐️⭐️⭐️
+                // 4. API 접근 권한 설정
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/**",              // 1. 님이 만들 API
-                                "/swagger-ui/**",       // 2. Swagger UI 페이지
-                                "/v3/api-docs/**",      // 3. 403 에러가 났던 Swagger 데이터
+                                "/api/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
-                        // 3-3. (기존 코드 유지) 그 외 모든 요청은 일단 인증 필요
                         .anyRequest().authenticated()
                 );
 
-        // (나중에 [Phase 2]에서 JWT 필터를 여기에 추가하게 됩니다)
-
         return http.build();
     }
-    // ⭐️ 3. CORS 설정을 위한 Bean을 SecurityConfig 클래스 "내부"에 추가합니다.
-    // (passwordEncoder Bean과 같은 레벨)
+
+    // ⭐️ 5. CORS 규칙 정의 (프론트엔드 팀 요청 반영)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // ⭐️ (개발 중) 모든 출처(Origin)를 허용합니다.
-        configuration.setAllowedOrigins(Arrays.asList("*"));
-        // ⭐️ 모든 HTTP 메서드 (GET, POST, PUT, DELETE 등)를 허용합니다.
-        configuration.setAllowedMethods(Arrays.asList("*"));
-        // ⭐️ 모든 헤더를 허용합니다.
+        // (1) 프론트엔드 주소 2개를 정확하게 명시 (와일드카드 * 대신 이걸 써야 Credentials 허용 가능)
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173",          // 프론트 로컬
+                "https://white-study-fe.vercel.app" // 프론트 배포
+        ));
+
+        // (2) 모든 HTTP 메서드 허용
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+
+        // (3) 모든 헤더 허용
         configuration.setAllowedHeaders(Arrays.asList("*"));
 
-        // (필요 시 주석 해제)
-        // configuration.setAllowCredentials(true);
+        // (4) 자격 증명(쿠키, 인증 헤더 등) 허용 -> 프론트엔드 로그인 구현에 필수!
+        configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // ⭐️ "/**" (모든 경로)에 대해 위 설정을 적용합니다.
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 
-    // 비밀번호 암호화도구를 Bean으로 등록
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Spring Security가 제공하는 표준 Bcrypt 암호화 도구를 반환합니다.
         return new BCryptPasswordEncoder();
     }
 }

@@ -1,5 +1,6 @@
 package teamprojects.demo.service.study;
 
+import teamprojects.demo.dto.category.CategoryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -50,6 +51,14 @@ public class StudyService {
     private final UserProfileRepository userProfileRepository; // ⭐️ 스터디장 신뢰도 조회용
     private final StudyApplicationRepository studyApplicationRepository; // ⭐️ 신청 상태 조회용
     private final TodoListRepository todoListRepository;
+
+
+    public List<CategoryResponse> getAllCategories() {
+        return studyCategoryRepository.findAll().stream()
+                .map(CategoryResponse::from)
+                .collect(Collectors.toList());
+    }
+
     /**
      * API 1-5: 스터디 목록 조회
      */

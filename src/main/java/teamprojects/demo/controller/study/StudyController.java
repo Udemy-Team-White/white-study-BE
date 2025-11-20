@@ -60,6 +60,9 @@ public class StudyController {
     @PostMapping("") // 최종 URL: /api/studies
     public ApiResponse<StudyCreateResponse> createStudy(@Valid @RequestBody StudyCreateRequest request) {
 
+        // ⭐️ [디버깅용 로그] 서버 로그(app.log)에 이 줄이 찍히나 봐야 합니다.
+        System.out.println("========== 스터디 개설 요청 들어옴! 제목: " + request.getTitle() + " ==========");
+
         // 1. StudyService의 스터디 개설 메서드 호출
         StudyCreateResponse responseDto = studyService.createStudy(request);
 

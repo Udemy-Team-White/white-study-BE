@@ -40,7 +40,7 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/categories/**").permitAll()
 
-                        .requestMatchers("/api/studies/**").permitAll()
+                        .requestMatchers("/api/studies", "/api/studies/**").permitAll()
 
                         // (2) Swagger 관련 URL 허용
                         .requestMatchers(

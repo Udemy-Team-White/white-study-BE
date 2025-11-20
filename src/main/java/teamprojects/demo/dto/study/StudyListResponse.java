@@ -32,6 +32,7 @@ public class StudyListResponse {
         private Integer maxMembers;     // maxMembers
         private String closedAt;        // closedAt (Datetime)
         private String status;          // status (모집 상태)
+        private String createdAt;       // 작성일
     }
     // StudyListResponse.java 내부에 중첩 클래스로 정의합니다.
     @Getter

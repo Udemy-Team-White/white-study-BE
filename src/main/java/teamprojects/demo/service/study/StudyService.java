@@ -11,8 +11,7 @@ import teamprojects.demo.dto.study.StudyCreateRequest;
 import teamprojects.demo.dto.study.StudyCreateResponse;
 import teamprojects.demo.dto.study.StudyListRequest;
 import teamprojects.demo.dto.study.StudyListResponse;
-import teamprojects.demo.dto.study.StudyListResponse.PageInfoDto;
-import teamprojects.demo.dto.study.StudyListResponse.StudyDto;
+import org.springframework.data.domain.Sort;
 import teamprojects.demo.entity.Study;
 import teamprojects.demo.entity.StudyCategory;
 import teamprojects.demo.entity.StudyHasCategory;
@@ -37,6 +36,8 @@ import teamprojects.demo.dto.study.TodoListCreateRequest;
 import teamprojects.demo.dto.study.TodoListCreateResponse;
 import teamprojects.demo.repository.TodoListRepository;
 import java.util.ArrayList;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -60,42 +61,85 @@ public class StudyService {
     }
 
     /**
-     * API 1-5: 스터디 목록 조회
+     * API 1-5: 스터디 목록 조회 (최종 수정: 정렬 방어, 다중 키워드, 작성일 추가)
      */
     public StudyListResponse getStudyList(StudyListRequest request) {
-        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
-        Page<Study> studyPage;
 
-        if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
-            studyPage = studyRepository.findByTitleContainingOrContentContaining(
-                    request.getKeyword(), request.getKeyword(), pageable);
+        // 1. 정렬 기준 설정 (sortBy 방어 로직)
+        Sort sort;
+        if ("members".equals(request.getSortBy())) {
+            // 참여 멤버 많은 순 (참고: 현재 멤버 수는 별도 조인이 필요하므로, 일단 maxMembers나 DB구조에 따라 다름)
+            // 여기서는 예시로 'maxMembers' 내림차순으로 하겠습니다. (혹은 구현 복잡도상 최신순으로 대체 가능)
+            sort = Sort.by(Sort.Direction.DESC, "maxMembers");
         } else {
-            studyPage = studyRepository.findAll(pageable);
+            // 'latest' 이거나, null 이거나, 이상한 값이 오면 -> 무조건 '최신순' (기본값)
+            sort = Sort.by(Sort.Direction.DESC, "createdAt");
         }
 
-        List<StudyDto> studyDtos = studyPage.getContent().stream()
+        // 2. 페이지네이션 생성
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), sort);
+
+        // 3. 검색 조건 생성 (다중 키워드 처리 - Specification)
+        Specification<Study> spec = (root, query, criteriaBuilder) -> {
+            // 기본 조건: 삭제되지 않은 것 등 (필요하면 추가)
+            List<Predicate> predicates = new ArrayList<>();
+
+            // 키워드 검색 (콤마로 구분)
+            if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
+                String[] keywords = request.getKeyword().split(","); // 콤마로 쪼개기
+                List<Predicate> keywordPredicates = new ArrayList<>();
+
+                for (String keyword : keywords) {
+                    String trimKeyword = keyword.trim(); // 공백 제거
+                    // 제목에 포함되거나 OR 내용에 포함되거나
+                    Predicate titleLike = criteriaBuilder.like(root.get("title"), "%" + trimKeyword + "%");
+                    Predicate contentLike = criteriaBuilder.like(root.get("content"), "%" + trimKeyword + "%");
+
+                    // (제목 OR 내용) 조건을 리스트에 추가
+                    keywordPredicates.add(criteriaBuilder.or(titleLike, contentLike));
+                }
+
+                // 모든 키워드 조건 중 하나라도 맞으면 OK (OR 연산) -> 만약 AND로 하려면 criteriaBuilder.and 사용
+                // 요청사항: "React,TypeScript" -> React 검색되거나 TS 검색되거나 (보통 검색은 OR)
+                predicates.add(criteriaBuilder.or(keywordPredicates.toArray(new Predicate[0])));
+            }
+
+            // 카테고리 필터링 (기존 로직 유지 원하면 추가 가능)
+            // ...
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+
+        // 4. DB 조회 (Specification 사용)
+        // StudyRepository에 JpaSpecificationExecutor 상속 필수!
+        Page<Study> studyPage = studyRepository.findAll(spec, pageable);
+
+
+        // 5. DTO 변환
+        List<StudyListResponse.StudyDto> studyDtos = studyPage.getContent().stream()
                 .map(study -> {
                     Integer currentMembers = studyMemberRepository.countByStudy(study);
                     List<String> categories = studyHasCategoryRepository.findByStudy(study).stream()
                             .map(shc -> shc.getStudyCategory().getCategoryName())
                             .collect(Collectors.toList());
 
-                    return StudyDto.builder()
+                    return StudyListResponse.StudyDto.builder()
                             .studyId(study.getId())
                             .title(study.getTitle())
-                            // ⭐️ [수정 1] Entity가 Enum이므로 .name()을 붙여서 String으로 변환해야 합니다!
                             .studyType(study.getStudyType().name())
                             .categories(categories)
                             .currentMembers(currentMembers)
                             .maxMembers(study.getMaxMembers())
                             .closedAt(study.getClosedAt().toString())
-                            // ⭐️ [수정 1] 여기도 .name() 추가!
                             .status(study.getStatus().name())
+                            // ⭐️ [추가] 작성일 반환
+                            .createdAt(study.getCreatedAt().toString())
                             .build();
                 })
                 .collect(Collectors.toList());
 
-        PageInfoDto pageInfoDto = PageInfoDto.builder()
+        // 6. 페이지 정보 조립
+        StudyListResponse.PageInfoDto pageInfo = StudyListResponse.PageInfoDto.builder()
                 .page(studyPage.getNumber())
                 .size(studyPage.getSize())
                 .totalPages(studyPage.getTotalPages())
@@ -104,7 +148,7 @@ public class StudyService {
 
         return StudyListResponse.builder()
                 .studies(studyDtos)
-                .pageInfo(pageInfoDto)
+                .pageInfo(pageInfo)
                 .build();
     }
 

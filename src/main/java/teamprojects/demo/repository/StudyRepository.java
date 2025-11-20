@@ -6,10 +6,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import teamprojects.demo.entity.Study;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query; // @Query 사용을 위해 추가
 import org.springframework.data.repository.query.Param; // @Param 사용을 위해 추가
 
-public interface StudyRepository extends JpaRepository<Study, Integer> {
+public interface StudyRepository extends JpaRepository<Study, Integer>,JpaSpecificationExecutor<Study> {
 
     // (기존 findByTitleContainingOrContentContaining 메서드 유지)
     Page<Study> findByTitleContainingOrContentContaining(String titleKeyword, String contentKeyword, Pageable pageable);

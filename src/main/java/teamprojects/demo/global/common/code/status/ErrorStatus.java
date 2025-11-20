@@ -20,7 +20,7 @@ public enum ErrorStatus implements BaseErrorCode {
     ALREADY_MEMBER_OR_APPLIED(HttpStatus.CONFLICT, 409, "이미 신청했거나 참여 중인 스터디입니다."),
 
 
-    LOGIN_FAILED(HttpStatus.UNAUTHORIZED, 401, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    LOGIN_FAILED(HttpStatus.UNAUTHORIZED, 400, "아이디 혹은 비밀번호가 다릅니다!"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, 401, "로그인 후 다시 시도해 주십시오."),
 
     // ⭐️ 2. 유효성 검사 실패 (카테고리 ID 등 잘못된 데이터, 400 Bad Request)

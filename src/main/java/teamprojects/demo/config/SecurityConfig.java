@@ -38,6 +38,10 @@ public class SecurityConfig {
                         // (1) 로그인, 회원가입, 이메일체크 등 Auth 관련 모든 URL 허용
                         .requestMatchers("/api/auth/**").permitAll()
 
+                        .requestMatchers("/api/categories/**").permitAll()
+
+                        .requestMatchers("/api/studies/**").permitAll()
+
                         // (2) Swagger 관련 URL 허용
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -46,9 +50,7 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
 
-                        .requestMatchers("/api/categories/**").permitAll()
-
-                        .requestMatchers("/api/studies/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
                         // (3) 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()

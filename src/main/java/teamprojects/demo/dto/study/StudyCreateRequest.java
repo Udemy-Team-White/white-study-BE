@@ -1,5 +1,6 @@
 package teamprojects.demo.dto.study;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -44,11 +45,11 @@ public class StudyCreateRequest {
 
     // ✅ 필수 4. 모집 마감일
     @NotNull(message = "모집 마감일은 필수입니다.")
-    @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     @Future(message = "모집 마감일은 현재 시간 이후여야 합니다.")
     private LocalDateTime closedAt;
 
     // 🔻 선택 3. 스터디 시작일
-    @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private LocalDateTime startDate;
 }

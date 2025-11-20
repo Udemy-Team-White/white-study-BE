@@ -124,26 +124,48 @@ public class UserService {
         return savedUser;
     }
 
-    //API 1-2
+    // API 1-2: 로그인
+    @Transactional // ⭐️ 데이터 변경(프로필 생성)이 일어날 수 있으니 Transactional 필수!
     public AuthLoginResponse login(AuthLoginRequest request) {
+
+        // 1. 아이디 확인
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new CustomException(ErrorStatus.LOGIN_FAILED));
 
+        // 2. 비밀번호 확인
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new CustomException(ErrorStatus.LOGIN_FAILED);
+            throw new CustomException(ErrorStatus.LOGIN_FAILED); // 400 Bad Request
         }
 
+        // ==================================================================
+        // ⭐️ [여기가 수정되었습니다]
+        // 기존: 프로필 없으면 -> 500 에러 (제 잘못)
+        // 수정: 프로필 없으면 -> 즉시 생성 -> 200 OK (로그인 성공)
+        // ==================================================================
         UserProfile userProfile = userProfileRepository.findByUser(user)
-                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+                .orElseGet(() -> {
+                    // DB에 프로필이 없으면 비상용 프로필을 생성해서 저장합니다.
+                    UserProfile newProfile = UserProfile.builder()
+                            .user(user)
+                            .username(user.getUsername())
+                            .points(0)
+                            .reliabilityScore(0)
+                            .introduction("안녕하세요! 반갑습니당.")
+                            .build();
+                    return userProfileRepository.save(newProfile);
+                });
+        // ==================================================================
 
+        // 4. 나머지 로직 (정상 진행)
         Integer requestCount = studyApplicationRepository.countPendingApplicationsByLeaderId(user.getId());
+        // TODO: 추후 JWT Provider 연동 필요
+        String accessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fakeToken";
 
-        String accessToken = "eyJhbGciOiJI...";
-
+        // 5. 200 OK 응답 데이터 조립
         return AuthLoginResponse.builder()
                 .accessToken(accessToken)
                 .userProfile(AuthLoginResponse.UserProfileDto.builder()
-                        .username(user.getUsername())
+                        .username(user.getUsername()) // 방금 만든 프로필의 정보가 들어감
                         .points(userProfile.getPoints())
                         .reliabilityScore(userProfile.getReliabilityScore())
                         .studyRequestCount(requestCount)

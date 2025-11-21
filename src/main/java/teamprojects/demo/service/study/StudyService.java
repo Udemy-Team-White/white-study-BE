@@ -153,23 +153,19 @@ public class StudyService {
     }
 
     /**
-     * API 2-1: 스터디 개설
+     * API 2-1: 스터디 개설 (최종 완성본)
      */
     @Transactional
     public StudyCreateResponse createStudy(StudyCreateRequest request) {
 
-        // 1. 로그인 사용자 확인
-        // 원래 코드 (나중에 JWT 완성하면 주석 푸세요):
-        // Integer currentUserId = SecurityUtils.getCurrentUserId()
-        //        .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
-
-        Integer currentUserId = 1;
-
+        // ⭐️ [수정 1] 하드코딩(1) 삭제하고, 진짜 토큰에서 유저 ID 꺼내오기!
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
 
         User leader = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
 
-        // ⭐️ [Null 방어 1] studyType이 없으면 'ONLINE'으로 기본 설정
+        // [Null 방어 1] studyType이 없으면 'ONLINE'으로 기본 설정
         Study.StudyType type;
         if (request.getStudyType() == null || request.getStudyType().isBlank()) {
             type = Study.StudyType.ONLINE; // 기본값
@@ -177,8 +173,7 @@ public class StudyService {
             try {
                 type = Study.StudyType.valueOf(request.getStudyType());
             } catch (IllegalArgumentException e) {
-                // 이상한 글자가 들어오면 기본값으로 처리 (선택 사항)
-                type = Study.StudyType.ONLINE;
+                type = Study.StudyType.ONLINE; // 이상한 값 들어오면 기본값
             }
         }
 
@@ -186,7 +181,8 @@ public class StudyService {
         Study newStudy = Study.builder()
                 .title(request.getTitle())
                 .content(request.getContent())
-                .studyType(Study.StudyType.valueOf(request.getStudyType()))
+                // ⭐️ [수정 2] request.get... 대신 위에서 만든 안전한 'type' 변수를 넣어야 합니다!
+                .studyType(type)
                 .maxMembers(request.getMaxMembers())
                 .closedAt(request.getClosedAt())
                 .startDate(request.getStartDate())
@@ -196,8 +192,7 @@ public class StudyService {
 
         newStudy = studyRepository.save(newStudy);
 
-        // 3. 카테고리 연결
-        // ⭐️ [방어 로직 2] 카테고리가 없어도(Null or Empty) 에러 안 나게 처리
+        // 3. 카테고리 연결 (Null 방어)
         if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
             for (Integer categoryId : request.getCategoryIds()) {
                 StudyCategory category = studyCategoryRepository.findById(categoryId)
@@ -300,8 +295,13 @@ public class StudyService {
             return "MEMBER";
         }
 
-        // 4. 신청 후 승인 대기 중 (APPLIED) - PENDING 상태 확인
-        if (studyApplicationRepository.existsByUserAndStudyAndStatus(currentUser, study, "PENDING")) {
+        // 4. ⭐️ [수정됨] 신청 후 승인 대기 중 (APPLIED) - Enum 타입으로 안전하게 비교!
+        boolean isPending = studyApplicationRepository.findByUserAndStudy(currentUser, study)
+                .stream()
+                // Enum 값(PENDING)과 직접 비교합니다. (가장 확실한 방법)
+                .anyMatch(app -> app.getStatus() == StudyApplication.ApplicationStatus.PENDING);
+
+        if (isPending) {
             return "APPLIED";
         }
 

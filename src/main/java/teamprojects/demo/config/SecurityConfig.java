@@ -13,10 +13,16 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import lombok.RequiredArgsConstructor;
+import teamprojects.demo.repository.UserRepository;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final UserRepository userRepository;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -33,7 +39,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 4. ⭐️ URL 접근 권한 설정 (이 부분이 핵심입니다!)
+                // 4. ️ URL 접근 권한 설정 (이 부분이 핵심입니다!)
                 .authorizeHttpRequests(auth -> auth
                         // (1) 로그인, 회원가입, 이메일체크 등 Auth 관련 모든 URL 허용
                         .requestMatchers("/api/auth/**").permitAll()
@@ -54,7 +60,10 @@ public class SecurityConfig {
 
                         // (3) 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
-                );
+                )
+
+                // ⭐️⭐️⭐️ [수정됨] 필터 생성 시 userRepository를 넘겨줍니다!
+                .addFilterBefore(new JwtFilter(userRepository), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

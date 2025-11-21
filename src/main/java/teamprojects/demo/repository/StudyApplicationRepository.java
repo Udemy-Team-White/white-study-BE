@@ -28,4 +28,7 @@ public interface StudyApplicationRepository extends JpaRepository<StudyApplicati
     // 🚨 [수정 완료] Long -> Integer로 변경해야 합니다!
     // (위에서 JpaRepository<..., Integer>로 선언했기 때문입니다.)
     Optional<StudyApplication> findByIdAndStudy(Integer applicationId, Study study);
+
+    //유저와 스터디 정보로 신청 내역 리스트를 가져오는 메서드
+    List<StudyApplication> findByUserAndStudy(User user, Study study);
 }

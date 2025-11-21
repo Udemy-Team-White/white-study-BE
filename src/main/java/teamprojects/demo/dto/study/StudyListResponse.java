@@ -25,6 +25,7 @@ public class StudyListResponse {
     @AllArgsConstructor
     public static class StudyDto {
         private Integer studyId;        // studyId
+        private String title;
         private String studyName;
         private String studyType;       // studyType
         private List<String> categories; // categories (N:M 관계로 인해 String List로 받음)

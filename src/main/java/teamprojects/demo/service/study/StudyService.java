@@ -111,6 +111,7 @@ public class StudyService {
 
                     return StudyListResponse.StudyDto.builder()
                             .studyId(study.getId())
+                            .title(study.getTitle())
                             .studyName(study.getStudyName())
                             .studyType(study.getStudyType().name())
                             .categories(categories)

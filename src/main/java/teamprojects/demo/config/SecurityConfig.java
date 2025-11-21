@@ -48,6 +48,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/studies", "/api/studies/**").permitAll()
 
+                        .requestMatchers("/api/users/**").permitAll()
+
                         // (2) Swagger 관련 URL 허용
                         .requestMatchers(
                                 "/swagger-ui/**",

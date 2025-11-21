@@ -331,36 +331,39 @@ public class UserService {
     }
 
     /**
-     * API 3-3: 내 스터디 목록 조회 로직
-     *
-     * @param userId  현재 로그인된 사용자의 ID
-     * @param request 쿼리 파라미터 (status, page, size)
-     * @return MyStudiesListResponse (스터디 목록 + 페이지 정보)
+     * API 3-3: 내 스터디 목록 조회 로직 (최종 수정)
      */
     public MyStudiesListResponse getMyStudies(Integer userId, MyStudiesQueryRequest request) {
 
-        // 1. Pageable 객체 생성 (page, size, 정렬 기준)
+        // 1. Pageable 생성
         Pageable pageable = PageRequest.of(
                 request.getPage(),
                 request.getSize(),
                 Sort.by("createdAt").descending()
         );
 
-        // 2. Repository 호출 (복잡한 쿼리 - User ID와 Status를 조건으로 조회)
-        // 🚨 이 메서드는 StudyRepository에 직접 정의해야 합니다.
+        // ⭐️ [핵심 수정] String(request.getStatus()) -> Enum(StudyStatus) 변환
+        Study.StudyStatus statusEnum = null;
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            try {
+                statusEnum = Study.StudyStatus.valueOf(request.getStatus());
+            } catch (IllegalArgumentException e) {
+                // 잘못된 문자열이 오면 null로 처리 (전체 조회됨)
+            }
+        }
+
+        // 2. Repository 호출 (이제 Enum 타입인 statusEnum을 넘깁니다!)
         Page<Study> studyPage = studyRepository.findStudiesByUserIdAndStatus(
                 userId,
-                request.getStatus(),
+                statusEnum, // ⭐️ 여기가 수정됨! (request.getStatus() 아님)
                 pageable
         );
 
-        // 3. Entity List -> DTO List 매핑
+        // 3. DTO 변환 (기존 코드 유지)
         List<StudySummaryDTO> studySummaryList = studyPage.getContent().stream()
                 .map(study -> {
-                    // 🚨 여기서 해당 스터디에서 사용자의 역할을 조회하는 로직이 필요합니다.
-                    String myRole = "LEADER"; // ⭐️ (임시 값) 실제 역할 조회 로직으로 대체 필요
+                    String myRole = study.getLeader().getId().equals(userId) ? "LEADER" : "MEMBER";
 
-                    // 🚨 스터디-카테고리 N:M 관계 매핑을 가정합니다.
                     List<String> categories = study.getCategoryMappings().stream()
                             .map(shc -> shc.getStudyCategory().getCategoryName())
                             .collect(Collectors.toList());
@@ -377,7 +380,6 @@ public class UserService {
                 })
                 .collect(Collectors.toList());
 
-        // 4. Page Info DTO 생성
         PageInfoDTO pageInfo = PageInfoDTO.builder()
                 .page(studyPage.getNumber())
                 .size(studyPage.getSize())
@@ -385,7 +387,6 @@ public class UserService {
                 .totalElements(studyPage.getTotalElements())
                 .build();
 
-        // 5. 최종 응답 DTO 반환
         return MyStudiesListResponse.builder()
                 .studies(studySummaryList)
                 .pageInfo(pageInfo)
@@ -393,38 +394,28 @@ public class UserService {
     }
 
     /**
-     * API 3-4: 포인트 내역 조회 로직
-     *
-     * @param userId 현재 로그인된 사용자의 ID
+     * API 3-4: 포인트 내역 조회 (유지 - Repository만 확인하면 됨)
      */
     @Transactional(readOnly = true)
     public PointHistoryListResponse getPointHistory(Integer userId, PointHistoryQueryRequest request) {
-
-        // 1. 현재 사용자 조회 및 보유 포인트 획득
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
 
-        // 🚨 [가정] User Entity의 getUserProfile().getPoints()를 통해 현재 포인트를 가져옵니다.
         Integer currentPoints = user.getUserProfile().getPoints();
-
-        // 2. Pageable 객체 생성 (Repository에서 이미 정렬하므로 Sort 제거)
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
-        // 3. 포인트 내역 조회 (PointHistoryRepository.findByUserOrderByCreatedAtDesc 사용)
+        // PointHistoryRepository에 이 메서드 필요!
         Page<PointHistory> historyPage = pointHistoryRepository.findByUserOrderByCreatedAtDesc(user, pageable);
 
-        // 4. Entity List -> DTO List 매핑
         List<PointHistorySummaryDTO> historySummaryList = historyPage.getContent().stream()
                 .map(history -> PointHistorySummaryDTO.builder()
                         .historyId(history.getId())
-                        // ⭐️ 엔티티 필드에 맞춘 getAmount() 사용
                         .changeAmount(history.getAmount())
                         .reason(history.getReason())
-                        .createdAt(history.getCreatedAt().toString()) // LocalDateTime -> String 변환 가정
+                        .createdAt(history.getCreatedAt().toString())
                         .build())
                 .collect(Collectors.toList());
 
-        // 5. Page Info DTO 생성
         PageInfoDTO pageInfo = PageInfoDTO.builder()
                 .page(historyPage.getNumber())
                 .size(historyPage.getSize())
@@ -432,7 +423,6 @@ public class UserService {
                 .totalElements(historyPage.getTotalElements())
                 .build();
 
-        // 6. 최종 응답 DTO 반환
         return PointHistoryListResponse.builder()
                 .currentPoints(currentPoints)
                 .history(historySummaryList)
@@ -441,40 +431,29 @@ public class UserService {
     }
 
     /**
-     * API 3-5: 신뢰도 내역 조회 로직
-     *
-     * @param userId  현재 로그인된 사용자의 ID
-     * @param request 쿼리 파라미터 (page, size)
-     * @return ReliabilityHistoryListResponse (현재 점수, 내역 목록 + 페이지 정보)
+     * API 3-5: 신뢰도 내역 조회 (유지 - Repository만 확인하면 됨)
      */
     @Transactional(readOnly = true)
     public ReliabilityHistoryListResponse getReliabilityHistory(Integer userId, ReliabilityHistoryQueryRequest request) {
-
-        // 1. 현재 사용자 조회 및 보유 신뢰도 점수 획득
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
 
-        // 🚨 [가정] User Entity의 getUserProfile().getReliabilityScore()를 통해 현재 점수를 가져옵니다.
         Integer currentScore = user.getUserProfile().getReliabilityScore();
-
-        // 2. Pageable 객체 생성
+        // 정렬 기준은 Repository 메서드 이름(OrderByCreatedAtDesc)에 포함되어 있으므로 PageRequest에서 뺄 수도 있지만, 명시해도 상관없음
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), Sort.by("createdAt").descending());
 
-        // 3. 신뢰도 내역 조회
-        // 🚨 [가정] ReliabilityHistoryRepository에 findByUserOrderByCreatedAtDesc 메서드가 정의되어 있어야 합니다.
+        // ReliabilityHistoryRepository에 이 메서드 필요!
         Page<ReliabilityHistory> historyPage = reliabilityHistoryRepository.findByUserOrderByCreatedAtDesc(user, pageable);
 
-        // 4. Entity List -> DTO List 매핑
         List<ReliabilityHistorySummaryDTO> historySummaryList = historyPage.getContent().stream()
                 .map(history -> ReliabilityHistorySummaryDTO.builder()
                         .historyId(history.getId())
                         .changeAmount(history.getChangeAmount())
                         .reason(history.getReason())
-                        .createdAt(history.getCreatedAt().toString()) // LocalDateTime -> String 변환 가정
+                        .createdAt(history.getCreatedAt().toString())
                         .build())
                 .collect(Collectors.toList());
 
-        // 5. Page Info DTO 생성 (기존 로직 재사용)
         PageInfoDTO pageInfo = PageInfoDTO.builder()
                 .page(historyPage.getNumber())
                 .size(historyPage.getSize())
@@ -482,7 +461,6 @@ public class UserService {
                 .totalElements(historyPage.getTotalElements())
                 .build();
 
-        // 6. 최종 응답 DTO 반환
         return ReliabilityHistoryListResponse.builder()
                 .currentScore(currentScore)
                 .history(historySummaryList)

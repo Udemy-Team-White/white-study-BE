@@ -111,9 +111,7 @@ public class StudyService {
 
                     return StudyListResponse.StudyDto.builder()
                             .studyId(study.getId())
-                            // ⭐️ [수정] title은 DTO에서 지웠으므로 studyName만 남깁니다!
                             .studyName(study.getStudyName())
-
                             .studyType(study.getStudyType().name())
                             .categories(categories)
                             .currentMembers(currentMembers)

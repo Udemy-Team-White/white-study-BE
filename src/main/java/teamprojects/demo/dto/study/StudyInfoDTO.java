@@ -14,6 +14,6 @@ import lombok.NoArgsConstructor;
 public class StudyInfoDTO {
 
     private Integer studyId;
-    private String title;
+    private String studyName;
     private String status;
 }

@@ -382,7 +382,7 @@ public class UserService {
 
                     return StudySummaryDTO.builder()
                             .studyId(study.getId())
-                            .title(study.getTitle())
+                            .studyName(study.getStudyName())
                             .studyType(study.getStudyType().name())
                             .categories(categories)
                             .currentMembers(study.getCurrentMembers())
@@ -552,7 +552,7 @@ public class UserService {
 
         StudyInfoDTO studyInfoDTO = StudyInfoDTO.builder()
                 .studyId(study.getId())
-                .title(study.getTitle())
+                .studyName(study.getStudyName())
                 .status(study.getStatus().name())
                 .build();
 

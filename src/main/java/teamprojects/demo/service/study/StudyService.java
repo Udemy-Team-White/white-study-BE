@@ -157,13 +157,15 @@ public class StudyService {
      */
     @Transactional
     public StudyCreateResponse createStudy(StudyCreateRequest request) {
+        System.out.println("1. 서비스 진입"); // 로그 추가
 
-        // ⭐️ [수정 1] 하드코딩(1) 삭제하고, 진짜 토큰에서 유저 ID 꺼내오기!
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+        System.out.println("2. 유저 ID 확인: " + currentUserId); // 로그 추가
 
         User leader = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+        System.out.println("3. 유저 조회 성공: " + leader.getUsername()); // 로그 추가
 
         // [Null 방어 1] studyType이 없으면 'ONLINE'으로 기본 설정
         Study.StudyType type;
@@ -191,6 +193,7 @@ public class StudyService {
                 .build();
 
         newStudy = studyRepository.save(newStudy);
+        System.out.println("4. 스터디 저장 완료: " + newStudy.getId()); // 로그 추가
 
         // 3. 카테고리 연결 (Null 방어)
         if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {

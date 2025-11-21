@@ -14,8 +14,6 @@ public interface StudyRepository extends JpaRepository<Study, Integer>, JpaSpeci
     Page<Study> findByTitleContainingOrContentContaining(String titleKeyword, String contentKeyword, Pageable pageable);
 
     // ⭐️ [수정됨] API 3-3: 내 스터디 목록 조회
-    // 1. status 타입을 String -> Study.StudyStatus (Enum)으로 변경
-    // 2. (:status IS NULL OR ...) 조건을 추가하여 전체 조회 기능 지원
     @Query("SELECT s FROM Study s JOIN s.studyMembers sm " +
             "WHERE sm.user.id = :userId " +
             "AND (:status IS NULL OR s.status = :status)")

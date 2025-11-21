@@ -331,7 +331,7 @@ public class UserService {
     }
 
     /**
-     * API 3-3: 내 스터디 목록 조회 로직 (최종 수정)
+     * API 3-3: 내 스터디 목록 조회 로직 (최종 수정: ALL 필터 추가)
      */
     public MyStudiesListResponse getMyStudies(Integer userId, MyStudiesQueryRequest request) {
 
@@ -342,28 +342,40 @@ public class UserService {
                 Sort.by("createdAt").descending()
         );
 
-        // ⭐️ [핵심 수정] String(request.getStatus()) -> Enum(StudyStatus) 변환
+        // ⭐️ [수정] String -> Enum 변환 (ALL 처리 추가)
         Study.StudyStatus statusEnum = null;
-        if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            try {
-                statusEnum = Study.StudyStatus.valueOf(request.getStatus());
-            } catch (IllegalArgumentException e) {
-                // 잘못된 문자열이 오면 null로 처리 (전체 조회됨)
+        String reqStatus = request.getStatus();
+
+        if (reqStatus != null && !reqStatus.isBlank()) {
+            // 1) "ALL" 이거나 빈 문자열이면 -> null로 둬서 전체 조회
+            if ("ALL".equalsIgnoreCase(reqStatus)) {
+                statusEnum = null;
+            }
+            // 2) 그 외(IN_PROGRESS 등)는 Enum으로 변환
+            else {
+                try {
+                    statusEnum = Study.StudyStatus.valueOf(reqStatus);
+                } catch (IllegalArgumentException e) {
+                    // 오타나 이상한 값이면? -> 일단 전체 조회(null)로 처리하거나 에러 (여기선 편의상 전체 조회)
+                    statusEnum = null;
+                }
             }
         }
 
-        // 2. Repository 호출 (이제 Enum 타입인 statusEnum을 넘깁니다!)
+        // 2. Repository 호출 (statusEnum이 null이면 전체 조회됨)
         Page<Study> studyPage = studyRepository.findStudiesByUserIdAndStatus(
                 userId,
-                statusEnum, // ⭐️ 여기가 수정됨! (request.getStatus() 아님)
+                statusEnum,
                 pageable
         );
 
-        // 3. DTO 변환 (기존 코드 유지)
+        // 3. DTO 변환
         List<StudySummaryDTO> studySummaryList = studyPage.getContent().stream()
                 .map(study -> {
+                    // 역할 결정
                     String myRole = study.getLeader().getId().equals(userId) ? "LEADER" : "MEMBER";
 
+                    // 카테고리 매핑
                     List<String> categories = study.getCategoryMappings().stream()
                             .map(shc -> shc.getStudyCategory().getCategoryName())
                             .collect(Collectors.toList());
@@ -376,6 +388,8 @@ public class UserService {
                             .currentMembers(study.getCurrentMembers())
                             .maxMembers(study.getMaxMembers())
                             .myRole(myRole)
+                            // ⭐️ [요청 1 해결] DB에 있는 상태값을 그대로 내려줍니다.
+                            .status(study.getStatus().name())
                             .build();
                 })
                 .collect(Collectors.toList());

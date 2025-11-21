@@ -43,7 +43,6 @@ public class StudyCreateRequest {
     private Integer maxMembers;
 
     // ✅ 필수 4. 모집 마감일
-    @NotNull(message = "모집 마감일은 필수입니다.")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     @Future(message = "모집 마감일은 현재 시간 이후여야 합니다.")
     private LocalDateTime closedAt;

@@ -49,7 +49,7 @@ public class Study {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "closed_at", nullable = false)
+    @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
     @Column(name = "start_date")
@@ -87,7 +87,8 @@ public class Study {
         RECRUITING,          // 모집 중
         RECRUITMENT_CLOSED,  // 모집 마감 (모집 인원 도달 또는 마감일 초과)
         IN_PROGRESS,         // 스터디 진행 중 (선택적)
-        FINISHED             // 스터디 종료 (선택적)
+        FINISHED,          // 스터디 종료 (선택적)
+        RECRUITING_IN_PROGRESS
     }
 
     // 3. (참고) StudyMember 엔티티에서 사용될 Enum (스터디장 등록 시 필요)

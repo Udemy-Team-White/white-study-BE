@@ -61,59 +61,45 @@ public class StudyService {
     }
 
     /**
-     * API 1-5: 스터디 목록 조회 (최종 수정: 정렬 방어, 다중 키워드, 작성일 추가)
+     * API 1-5: 스터디 목록 조회 (최종 수정: 정렬, 검색, 작성일, Null 방어 적용)
      */
     public StudyListResponse getStudyList(StudyListRequest request) {
 
-        // 1. 정렬 기준 설정 (sortBy 방어 로직)
+        // 1. 정렬 기준 설정
         Sort sort;
         if ("members".equals(request.getSortBy())) {
-            // 참여 멤버 많은 순 (참고: 현재 멤버 수는 별도 조인이 필요하므로, 일단 maxMembers나 DB구조에 따라 다름)
-            // 여기서는 예시로 'maxMembers' 내림차순으로 하겠습니다. (혹은 구현 복잡도상 최신순으로 대체 가능)
             sort = Sort.by(Sort.Direction.DESC, "maxMembers");
         } else {
-            // 'latest' 이거나, null 이거나, 이상한 값이 오면 -> 무조건 '최신순' (기본값)
             sort = Sort.by(Sort.Direction.DESC, "createdAt");
         }
 
         // 2. 페이지네이션 생성
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), sort);
 
-        // 3. 검색 조건 생성 (다중 키워드 처리 - Specification)
+        // 3. 검색 조건 생성 (Specification)
         Specification<Study> spec = (root, query, criteriaBuilder) -> {
-            // 기본 조건: 삭제되지 않은 것 등 (필요하면 추가)
             List<Predicate> predicates = new ArrayList<>();
 
             // 키워드 검색 (콤마로 구분)
             if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
-                String[] keywords = request.getKeyword().split(","); // 콤마로 쪼개기
+                String[] keywords = request.getKeyword().split(",");
                 List<Predicate> keywordPredicates = new ArrayList<>();
 
                 for (String keyword : keywords) {
-                    String trimKeyword = keyword.trim(); // 공백 제거
-                    // 제목에 포함되거나 OR 내용에 포함되거나
+                    String trimKeyword = keyword.trim();
                     Predicate titleLike = criteriaBuilder.like(root.get("title"), "%" + trimKeyword + "%");
                     Predicate contentLike = criteriaBuilder.like(root.get("content"), "%" + trimKeyword + "%");
 
-                    // (제목 OR 내용) 조건을 리스트에 추가
+                    // ⭐️ [수정] 중복된 add 코드를 하나로 정리했습니다.
                     keywordPredicates.add(criteriaBuilder.or(titleLike, contentLike));
                 }
-
-                // 모든 키워드 조건 중 하나라도 맞으면 OK (OR 연산) -> 만약 AND로 하려면 criteriaBuilder.and 사용
-                // 요청사항: "React,TypeScript" -> React 검색되거나 TS 검색되거나 (보통 검색은 OR)
                 predicates.add(criteriaBuilder.or(keywordPredicates.toArray(new Predicate[0])));
             }
-
-            // 카테고리 필터링 (기존 로직 유지 원하면 추가 가능)
-            // ...
-
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
 
-        // 4. DB 조회 (Specification 사용)
-        // StudyRepository에 JpaSpecificationExecutor 상속 필수!
+        // 4. DB 조회
         Page<Study> studyPage = studyRepository.findAll(spec, pageable);
-
 
         // 5. DTO 변환
         List<StudyListResponse.StudyDto> studyDtos = studyPage.getContent().stream()
@@ -125,14 +111,18 @@ public class StudyService {
 
                     return StudyListResponse.StudyDto.builder()
                             .studyId(study.getId())
-                            .title(study.getTitle())
+                            // ⭐️ [수정] title은 DTO에서 지웠으므로 studyName만 남깁니다!
+                            .studyName(study.getStudyName())
+
                             .studyType(study.getStudyType().name())
                             .categories(categories)
                             .currentMembers(currentMembers)
                             .maxMembers(study.getMaxMembers())
-                            .closedAt(study.getClosedAt().toString())
+
+                            // ⭐️ [수정] closedAt이 Null일 경우 방어 로직 추가
+                            .closedAt(study.getClosedAt() != null ? study.getClosedAt().toString() : null)
+
                             .status(study.getStatus().name())
-                            // ⭐️ [추가] 작성일 반환
                             .createdAt(study.getCreatedAt().toString())
                             .build();
                 })
@@ -179,8 +169,8 @@ public class StudyService {
         // 2. 스터디 생성
         Study newStudy = Study.builder()
                 .title(request.getTitle())
+                .studyName(request.getTitle())
                 .content(request.getContent())
-                // ⭐️ [수정 2] request.get... 대신 위에서 만든 안전한 'type' 변수를 넣어야 합니다!
                 .studyType(type)
                 .maxMembers(request.getMaxMembers())
                 .closedAt(request.getClosedAt())
@@ -309,49 +299,60 @@ public class StudyService {
         return "NONE";
     }
 
+    /**
+     * API 2-3: 스터디 참여 신청 (최종 수정: 상태 추가 & Enum 안전 비교)
+     */
     @Transactional
     public StudyApplyResponse applyToStudy(Integer studyId, StudyApplyRequest request) {
 
-        // 1. 현재 로그인 사용자 확인 (401 Unauthorized)
+        // 1. 유저 확인
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
 
         User applicant = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR)); // DB 오류 또는 사용자 탈퇴
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
 
-        // 2. 스터디 존재 확인 및 모집 상태 확인 (404/400)
+        // 2. 스터디 확인
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 2-1. 모집 상태 확인 (모집 중이 아니라면 400 Bad Request)
-        if (study.getStatus() != Study.StudyStatus.RECRUITING) {
-            throw new CustomException(ErrorStatus.RECRUITMENT_CLOSED); // ⭐️ RECRUITMENT_CLOSED 에러 코드를 가정합니다.
+        // ⭐️ [수정 1] 모집 상태 확인 (조건 추가!)
+        // "모집 중" 이거나 "진행 중&추가모집" 상태면 신청 가능!
+        boolean isRecruiting = study.getStatus() == Study.StudyStatus.RECRUITING ||
+                study.getStatus() == Study.StudyStatus.RECRUITING_IN_PROGRESS;
+
+        if (!isRecruiting) {
+            throw new CustomException(ErrorStatus.RECRUITMENT_CLOSED);
         }
 
-        // 3. 중복 신청/멤버 확인 (409 Conflict)
+        // 3. 중복 확인
 
-        // 3-1. 이미 확정 멤버인지 확인 (StudyMember 테이블)
+        // 3-1. 이미 멤버인지 확인
         if (studyMemberRepository.existsByUserAndStudy(applicant, study)) {
-            throw new CustomException(ErrorStatus.ALREADY_MEMBER_OR_APPLIED); // ⭐️ ALREADY_MEMBER_OR_APPLIED 에러 코드를 가정합니다.
-        }
-
-        // 3-2. 이미 PENDING 상태로 신청했는지 확인 (StudyApplication 테이블)
-        if (studyApplicationRepository.existsByUserAndStudyAndStatus(applicant, study, "PENDING")) {
             throw new CustomException(ErrorStatus.ALREADY_MEMBER_OR_APPLIED);
         }
 
-        // 4. StudyApplication Entity 생성 및 저장
+        // 3-2. ⭐️ [수정 2] 이미 신청했는지 확인 (Enum 안전 비교)
+        // 리포지토리 메서드(exists...String) 대신, 리스트를 가져와서 스트림으로 검사합니다.
+        // (이게 가장 안전하고 확실한 방법입니다.)
+        boolean alreadyApplied = studyApplicationRepository.findByUserAndStudy(applicant, study)
+                .stream()
+                .anyMatch(app -> app.getStatus() == StudyApplication.ApplicationStatus.PENDING);
+
+        if (alreadyApplied) {
+            throw new CustomException(ErrorStatus.ALREADY_MEMBER_OR_APPLIED);
+        }
+
+        // 4. 저장
         StudyApplication newApplication = StudyApplication.builder()
                 .study(study)
                 .user(applicant)
-                // ⭐️ StudyApplication 엔티티 내부에 ApplicationStatus Enum이 있다고 가정합니다.
                 .status(StudyApplication.ApplicationStatus.PENDING)
-                .message(request.getMessage()) // Optional 메시지
+                .message(request.getMessage())
                 .build();
 
         newApplication = studyApplicationRepository.save(newApplication);
 
-        // 5. 응답 DTO 반환 (PENDING 상태와 생성된 ID 반환)
         return StudyApplyResponse.builder()
                 .applicationId(newApplication.getId())
                 .status(newApplication.getStatus().name())

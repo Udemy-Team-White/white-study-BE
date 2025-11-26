@@ -182,4 +182,17 @@ public class StudyController {
 
         return ApiResponse.onCreated(responseDto, message);
     }
+    /**
+     * API 4-8: 셀프 보고서 목록 조회
+     * URL: GET /api/studies/{studyId}/reports?page=0&size=20
+     */
+    @GetMapping("/{studyId}/reports")
+    public ApiResponse<SelfReportListResponse> getSelfReportList(
+            @PathVariable("studyId") Integer studyId,
+            @Valid @ModelAttribute SelfReportListRequest request) { // Query Parameter 받기
+
+        SelfReportListResponse responseDto = studyService.getSelfReportList(studyId, request);
+
+        return ApiResponse.onSuccess(responseDto, "셀프 보고서 목록 조회 성공");
+    }
 }

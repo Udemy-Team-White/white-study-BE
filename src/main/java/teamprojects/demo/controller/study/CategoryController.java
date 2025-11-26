@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/categories") // ⭐️ 요청 주소 확인
+@RequestMapping("/api/categories")
 public class CategoryController {
 
     // 새로 만든 서비스 대신, 기존 StudyService를 주입받습니다.

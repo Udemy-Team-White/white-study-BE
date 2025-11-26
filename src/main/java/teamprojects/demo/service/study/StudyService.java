@@ -54,6 +54,7 @@ import teamprojects.demo.repository.*;
 
 
 
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -646,6 +647,66 @@ public class StudyService {
         return SelfReportRewardResponse.builder()
                 .selfReportId(newReport.getId())
                 .reward(rewardDto)
+                .build();
+    }
+    /**
+     * API 4-8: 셀프 보고서 목록 조회 (페이지네이션)
+     */
+    public SelfReportListResponse getSelfReportList(Integer studyId, SelfReportListRequest request) {
+
+        // 1. 현재 사용자 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        // 2. 스터디 확인
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 권한 확인 (멤버만 접근 가능 -> 403)
+        if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
+        }
+
+        // 4. 페이지네이션 준비
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
+
+        // 5. DB 조회 (SelfReportRepository에 메서드 있어야 함!)
+        Page<SelfReport> reportPage = selfReportRepository.findByStudyOrderByCreatedAtDesc(study, pageable);
+
+        // 6. DTO 변환 (내용 100자 요약 처리)
+        List<SelfReportListResponse.SelfReportSummaryDto> reportDtos = reportPage.getContent().stream()
+                .map(report -> {
+                    // HTML 태그 제거 후 순수 텍스트 추출
+                    String plainText = HtmlStripper.stripTags(report.getContent());
+
+                    // 100자 자르기 (길이가 100보다 작으면 그대로, 크면 자르고 "...")
+                    String snippet = plainText.length() > 100
+                            ? plainText.substring(0, 100) + "..."
+                            : plainText;
+
+                    return SelfReportListResponse.SelfReportSummaryDto.builder()
+                            .reportId(report.getId())
+                            .authorUsername(report.getUser().getUsername())
+                            .contentSnippet(snippet)
+                            .createdAt(report.getCreatedAt().toString())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // 7. 페이지 정보 조립
+        SelfReportListResponse.PageInfoDto pageInfo = SelfReportListResponse.PageInfoDto.builder()
+                .page(reportPage.getNumber())
+                .size(reportPage.getSize())
+                .totalPages(reportPage.getTotalPages())
+                .totalElements(reportPage.getTotalElements())
+                .build();
+
+        return SelfReportListResponse.builder()
+                .reports(reportDtos)
+                .pageInfo(pageInfo)
                 .build();
     }
 }

@@ -709,4 +709,104 @@ public class StudyService {
                 .pageInfo(pageInfo)
                 .build();
     }
+    /**
+     * API 4-9: 셀프 보고서 상세 조회
+     * URL: /api/reports/{reportId}
+     */
+    public SelfReportDetailResponse getSelfReportDetail(Integer reportId) {
+
+        // 1. 현재 사용자 확인 (비로그인이면 401)
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        // 2. 보고서 존재 확인 (404)
+        SelfReport report = selfReportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        // 3. ⭐️ 권한 체크 (403 Forbidden)
+        // "보고서가 속한 스터디"의 멤버여야만 볼 수 있습니다.
+        if (!studyMemberRepository.existsByUserAndStudy(currentUser, report.getStudy())) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
+        }
+
+        // 4. 내가 쓴 글인지 확인 (isMine)
+        boolean isMine = report.getUser().getId().equals(currentUserId);
+
+        // 5. DTO 반환
+        return SelfReportDetailResponse.builder()
+                .reportId(report.getId())
+                .authorUsername(report.getUser().getUsername())
+                .subject(report.getSubject())
+                .summary(report.getSummary())
+                .content(report.getContent())
+                .createdAt(report.getCreatedAt().toString())
+                .isMine(isMine)
+                .build();
+    }
+    /**
+     * API 4-10: 셀프 보고서 수정
+     */
+    @Transactional
+    public SelfReportUpdateResponse updateSelfReport(Integer reportId, SelfReportUpdateRequest request) {
+
+        // 1. 현재 사용자 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 보고서 조회 (없으면 404)
+        SelfReport report = selfReportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        // 3. ⭐️ 권한 체크 (작성자 본인 확인 -> 403)
+        if (!report.getUser().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // "본인이 작성한 보고서만..."
+        }
+
+        // 4. 내용 수정 (Dirty Checking으로 자동 저장됨)
+        report.updateContent(request.getContent());
+
+        // (만약 제목/요약도 수정한다면)
+        if (request.getSubject() != null) report.updateSubject(request.getSubject());
+        if (request.getSummary() != null) report.updateSummary(request.getSummary());
+
+        // 5. 명시적 저장 (updateAt 갱신을 위해)
+        selfReportRepository.save(report);
+
+        // 6. 응답 DTO 반환
+        return SelfReportUpdateResponse.builder()
+                .reportId(report.getId())
+                .content(report.getContent())
+                .updatedAt(report.getUpdatedAt().toString()) // Entity에 @UpdateTimestamp 있어야 함
+                .build();
+    }
+    /**
+     * API 4-11: 셀프 보고서 삭제
+     */
+    @Transactional
+    public SelfReportDeleteResponse deleteSelfReport(Integer reportId) {
+
+        // 1. 현재 사용자 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 보고서 조회 (없으면 404)
+        SelfReport report = selfReportRepository.findById(reportId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        // 3. ⭐️ 권한 체크 (작성자 본인 확인 -> 403)
+        if (!report.getUser().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // "본인이 작성한 보고서만..."
+        }
+
+        // 4. 삭제
+        selfReportRepository.delete(report);
+
+        // 5. 응답 DTO 반환
+        return SelfReportDeleteResponse.builder()
+                .deletedReportId(reportId)
+                .build();
+    }
 }

@@ -27,7 +27,7 @@ import teamprojects.demo.dto.study.TodoListCreateRequest;
 import teamprojects.demo.dto.study.TodoListCreateResponse;
 import teamprojects.demo.dto.study.StudyDashboardResponse;
 import teamprojects.demo.service.user.UserService;
-
+import teamprojects.demo.dto.study.*;
 
 @RestController // ⭐️ REST API 컨트롤러
 @RequiredArgsConstructor
@@ -163,5 +163,23 @@ public class StudyController {
 
         // 2. 201 Created 응답 반환
         return ApiResponse.onCreated(responseDto);
+    }
+    /**
+     * API 4-7: 셀프 보고서 제출
+     * URL: POST /api/studies/{studyId}/reports
+     */
+    @PostMapping("/{studyId}/reports")
+    public ApiResponse<SelfReportRewardResponse> submitSelfReport(
+            @PathVariable("studyId") Integer studyId,
+            @Valid @RequestBody SelfReportCreateRequest request) {
+
+        SelfReportRewardResponse responseDto = studyService.submitSelfReport(studyId, request);
+
+        // 150자 이상 작성 시 메시지 변경 (reward가 null인지 아닌지로 판단)
+        String message = responseDto.getReward() != null
+                ? "셀프 보고서가 제출되었습니다. 150자 이상 작성 보상 (신뢰도 +1)이 지급되었습니다!"
+                : "셀프 보고서가 제출되었습니다.";
+
+        return ApiResponse.onCreated(responseDto, message);
     }
 }

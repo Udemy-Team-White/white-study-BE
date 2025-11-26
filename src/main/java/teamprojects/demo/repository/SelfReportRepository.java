@@ -19,10 +19,10 @@ public interface SelfReportRepository extends JpaRepository<SelfReport, Integer>
     // (API 5-9: 스터디의 보고서 목록 '페이지네이션' 조회 시 사용)
     Page<SelfReport> findByStudyOrderByCreatedAtDesc(Study study, Pageable pageable);
 
-    // (API 5-8: 하루에 한 번만 작성 가능하도록 중복 체크 시 사용)
-    boolean existsByUserAndStudyAndCreatedAtBetween(User user, Study study, LocalDateTime startOfDay, LocalDateTime endOfDay);
+    // api 4-7
+    boolean existsByStudyAndUserAndCreatedAtBetween(Study study, User user, LocalDateTime start, LocalDateTime end);
 
     // (API 5-10: 상세 조회 시 '내가 쓴 글'인지 확인하는 로직에서 사용)
-    Optional<SelfReport> findByIdAndUser(Long reportId, User user);
+    Optional<SelfReport> findByIdAndUser(Integer reportId, User user);
 
 }

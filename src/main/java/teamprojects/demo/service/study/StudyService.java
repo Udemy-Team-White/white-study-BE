@@ -42,6 +42,17 @@ import teamprojects.demo.dto.study.TodoItemCreateRequest;
 import teamprojects.demo.dto.study.TodoItemResponse;
 import teamprojects.demo.entity.TodoItem;
 import teamprojects.demo.repository.TodoItemRepository;
+import teamprojects.demo.dto.study.TodoItemUpdateRequest;
+import teamprojects.demo.dto.study.TodoItemStatusResponse;
+import teamprojects.demo.dto.study.TodoItemDeleteResponse;
+import teamprojects.demo.global.utils.HtmlStripper;
+import teamprojects.demo.entity.SelfReport;
+import teamprojects.demo.entity.ReliabilityHistory;
+import teamprojects.demo.dto.study.*;
+import teamprojects.demo.entity.*;
+import teamprojects.demo.repository.*;
+
+
 
 @Service
 @RequiredArgsConstructor
@@ -57,6 +68,8 @@ public class StudyService {
     private final StudyApplicationRepository studyApplicationRepository; // ⭐️ 신청 상태 조회용
     private final TodoListRepository todoListRepository;
     private final TodoItemRepository todoItemRepository;
+    private final SelfReportRepository selfReportRepository;
+    private final ReliabilityHistoryRepository reliabilityHistoryRepository;
 
 
     public List<CategoryResponse> getAllCategories() {
@@ -488,6 +501,151 @@ public class StudyService {
                 .todoItemId(newItem.getId())
                 .content(newItem.getContent())
                 .isCompleted(newItem.getIsCompleted())
+                .build();
+    }
+    /**
+     * API 4-5: TODO 항목 상태 변경 (Service)
+     */
+    @Transactional
+    public TodoItemStatusResponse updateTodoItemStatus(Integer itemId, TodoItemUpdateRequest request) {
+
+        // 1. 현재 사용자 확인 (401 Unauthorized 방지)
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. TodoItem 존재 확인 (404 Not Found)
+        TodoItem item = todoItemRepository.findById(itemId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND)); // 리소스가 없으면 404
+
+        // 3. 권한 확인 (본인 TodoList의 항목이 맞는지)
+        // TodoItem -> TodoList -> User (소유자)
+        if (!item.getTodoList().getUser().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // 403 Forbidden 반환
+        }
+
+        // 4. 상태 업데이트
+        item.setIsCompleted(request.getIsCompleted());
+
+        // 5. 저장 (save는 @Transactional 때문에 생략 가능하나 명시적으로 호출)
+        todoItemRepository.save(item);
+
+        // 6. 응답 DTO 반환 (명세 반영)
+        return TodoItemStatusResponse.builder()
+                .todoItemId(item.getId())
+                .isCompleted(item.getIsCompleted())
+                .build();
+    }
+    /**
+     * API 4-6: TODO 항목 삭제 로직 (Service)
+     */
+    @Transactional
+    public TodoItemDeleteResponse deleteTodoItem(Integer todoItemId) {
+
+        // 1. 현재 사용자 확인 (401 Unauthorized 방지)
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. TodoItem 존재 확인 (404 Not Found)
+        TodoItem item = todoItemRepository.findById(todoItemId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND)); // 리소스가 없으면 404
+
+        // 3. 권한 확인 (403 Forbidden)
+        // TodoItem -> TodoList -> User (소유자)를 확인
+        if (!item.getTodoList().getUser().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // 403 Forbidden 반환
+        }
+
+        // 4. 삭제
+        todoItemRepository.delete(item);
+
+        // 5. 응답 DTO 반환 (명세 반영)
+        return TodoItemDeleteResponse.builder()
+                .deletedTodoItemId(todoItemId)
+                .build();
+    }
+    /**
+     * API 4-7: 셀프 보고서 제출
+     * * @param studyId Path Variable
+     * @param request SelfReportCreateRequest DTO
+     * @return SelfReportRewardResponse DTO
+     */
+    @Transactional
+    public SelfReportRewardResponse submitSelfReport(Integer studyId, SelfReportCreateRequest request) {
+
+        // 1. 현재 사용자 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        // 2. 스터디 존재 확인 및 멤버 자격 확인 (404/403)
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+        if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
+        }
+
+        // 3. ⭐️ 중복 제출 확인 (409 Conflict)
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.atTime(23, 59, 59);
+
+        // ⭐️ SelfReportRepository에 existsBy... 메서드가 있어야 합니다.
+        boolean alreadySubmitted = selfReportRepository.existsByStudyAndUserAndCreatedAtBetween(
+                study, currentUser, startOfDay, endOfDay
+        );
+
+        if (alreadySubmitted) {
+            throw new CustomException(ErrorStatus.REPORT_ALREADY_SUBMITTED); // 409 Conflict
+        }
+
+        // 4. 보고서 Entity 생성 및 저장
+        SelfReport newReport = SelfReport.builder()
+                .study(study)
+                .user(currentUser)
+                .subject(request.getSubject())
+                .summary(request.getSummary())
+                .content(request.getContent())
+                .build();
+
+        newReport = selfReportRepository.save(newReport);
+
+        // 5. ⭐️ 보상 로직 적용 (HTML 태그 제거 후 글자 수 세기)
+        int charCount = HtmlStripper.countStrippedCharacters(request.getContent()); // ⭐️ 유틸 사용
+
+        SelfReportRewardResponse.RewardDto rewardDto = null;
+
+        if (charCount >= 150) {
+            // 5-1. 신뢰도 증가 로직
+            UserProfile userProfile = userProfileRepository.findByUser(currentUser)
+                    .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+            final int RELIABILITY_REWARD = 1;
+
+            // UserProfile 업데이트 (엔티티에 updateReliabilityScore(int) 메서드가 있다고 가정)
+            userProfile.updateReliabilityScore(userProfile.getReliabilityScore() + RELIABILITY_REWARD);
+            userProfileRepository.save(userProfile); // 필요 시 명시적 저장
+
+            // ReliabilityHistory 저장
+            ReliabilityHistory history = ReliabilityHistory.builder()
+                    .user(currentUser)
+                    .changeAmount(RELIABILITY_REWARD)
+                    .reason("셀프 보고서 150자 이상 작성")
+                    .build();
+            reliabilityHistoryRepository.save(history);
+
+            // 응답 DTO에 보상 정보 채우기
+            rewardDto = SelfReportRewardResponse.RewardDto.builder()
+                    .type("RELIABILITY")
+                    .changeAmount(RELIABILITY_REWARD)
+                    .reason("셀프 보고서 150자 이상 작성")
+                    .build();
+        }
+
+        // 6. 최종 응답 반환
+        return SelfReportRewardResponse.builder()
+                .selfReportId(newReport.getId())
+                .reward(rewardDto)
                 .build();
     }
 }

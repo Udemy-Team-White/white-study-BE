@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Builder
+@Setter
 @AllArgsConstructor
 @Table(name = "TODO_ITEM")
 @DynamicInsert

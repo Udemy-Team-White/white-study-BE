@@ -52,6 +52,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/todo-lists/**").permitAll()
 
+                        .requestMatchers("/api/todo-items/**").permitAll()
+
                         // (2) Swagger 관련 URL 허용
                         .requestMatchers(
                                 "/swagger-ui/**",

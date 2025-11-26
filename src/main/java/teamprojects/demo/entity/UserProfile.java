@@ -57,4 +57,8 @@ public class UserProfile {
             user.setUserProfile(this);
         }
     }
+    public void updateReliabilityScore(Integer changeAmount) {
+        // 기존 점수에 변화량(reward)을 더합니다.
+        this.reliabilityScore += changeAmount;
+    }
 }

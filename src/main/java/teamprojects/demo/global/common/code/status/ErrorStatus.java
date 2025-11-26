@@ -18,7 +18,7 @@ public enum ErrorStatus implements BaseErrorCode {
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, 409, "이미 사용 중인 닉네임입니다."), // ⭐️ 세미콜론(;) 확인
     // 3. 이미 멤버이거나 신청 대기 중일 때 (409 Conflict)
     ALREADY_MEMBER_OR_APPLIED(HttpStatus.CONFLICT, 409, "이미 신청했거나 참여 중인 스터디입니다."),
-
+    REPORT_ALREADY_SUBMITTED(HttpStatus.CONFLICT, 409, "셀프 보고서는 하루에 한 번만 작성할 수 있습니다."),
 
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, 401, "아이디 혹은 비밀번호가 다릅니다!"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, 401, "로그인 후 다시 시도해 주십시오."),

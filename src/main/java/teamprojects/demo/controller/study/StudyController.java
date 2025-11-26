@@ -28,6 +28,7 @@ import teamprojects.demo.dto.study.TodoListCreateResponse;
 import teamprojects.demo.dto.study.StudyDashboardResponse;
 import teamprojects.demo.service.user.UserService;
 
+
 @RestController // ⭐️ REST API 컨트롤러
 @RequiredArgsConstructor
 @RequestMapping("/api/studies") // ⭐️ 기본 URL: /api/studies

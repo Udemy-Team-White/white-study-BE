@@ -50,6 +50,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/users/**").permitAll()
 
+                        .requestMatchers("/api/todo-lists/**").permitAll()
+
                         // (2) Swagger 관련 URL 허용
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -64,7 +66,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // ⭐️⭐️⭐️ [수정됨] 필터 생성 시 userRepository를 넘겨줍니다!
+                // [수정됨] 필터 생성 시 userRepository를 넘겨줍니다!
                 .addFilterBefore(new JwtFilter(userRepository), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

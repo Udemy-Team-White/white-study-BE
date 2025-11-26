@@ -38,6 +38,10 @@ import teamprojects.demo.repository.TodoListRepository;
 import java.util.ArrayList;
 import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.criteria.Predicate;
+import teamprojects.demo.dto.study.TodoItemCreateRequest;
+import teamprojects.demo.dto.study.TodoItemResponse;
+import teamprojects.demo.entity.TodoItem;
+import teamprojects.demo.repository.TodoItemRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +56,7 @@ public class StudyService {
     private final UserProfileRepository userProfileRepository; // ⭐️ 스터디장 신뢰도 조회용
     private final StudyApplicationRepository studyApplicationRepository; // ⭐️ 신청 상태 조회용
     private final TodoListRepository todoListRepository;
+    private final TodoItemRepository todoItemRepository;
 
 
     public List<CategoryResponse> getAllCategories() {
@@ -446,6 +451,43 @@ public class StudyService {
                 .title(newTodoList.getTitle())
                 .targetDate(newTodoList.getTargetDate())
                 .items(new ArrayList<>()) // 생성 시에는 항상 빈 목록 반환
+                .build();
+    }
+    /**
+     * API 4-4: TODO 항목 생성 로직 (Service)
+     * listId: Path Variable로 받은 TodoList ID
+     */
+    @Transactional
+    public TodoItemResponse createTodoItem(Integer listId, TodoItemCreateRequest request) {
+
+        // 1. 현재 사용자 확인 (401 Unauthorized 방지)
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. TodoList 존재 확인 (404 Not Found)
+        TodoList todoList = todoListRepository.findById(listId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        // 3. 권한 확인 (403 Forbidden)
+        // TodoList의 소유자(User)와 현재 로그인한 유저의 ID가 일치하는지 확인
+        if (!todoList.getUser().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // ⭐️ 403 Forbidden 반환
+        }
+
+        // 4. TodoItem Entity 생성
+        TodoItem newItem = TodoItem.builder()
+                .todoList(todoList)
+                .content(request.getContent())
+                .isCompleted(false) // 명세대로 항상 false로 생성
+                .build();
+
+        newItem = todoItemRepository.save(newItem);
+
+        // 5. 응답 DTO 반환
+        return TodoItemResponse.builder()
+                .todoItemId(newItem.getId())
+                .content(newItem.getContent())
+                .isCompleted(newItem.getIsCompleted())
                 .build();
     }
 }

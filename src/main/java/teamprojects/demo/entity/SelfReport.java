@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -50,5 +51,20 @@ public class SelfReport {
         this.subject = subject;
         this.summary = summary;
         this.content = content;
+    }
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
+    public void updateSubject(String subject) {
+        this.subject = subject;
+    }
+
+    public void updateSummary(String summary) {
+        this.summary = summary;
     }
 }

@@ -47,4 +47,9 @@ public class StudyMember {
         LEADER,     // 스터디장
         MEMBER      // 일반 멤버
     }
+
+    // StudyMember.java
+    public void updateRole(StudyRole role) {
+        this.role = role;
+    }
 }

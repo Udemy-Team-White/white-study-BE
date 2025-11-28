@@ -4,7 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import teamprojects.demo.entity.Study;
 import teamprojects.demo.entity.StudyMember;
 import teamprojects.demo.entity.User;
-
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,4 +31,8 @@ public interface StudyMemberRepository extends JpaRepository<StudyMember, Intege
 
     // (보안: 사용자가 스터디 멤버인지 확인 시 사용)
     Optional<StudyMember> findByUserAndStudy(User user, Study study);
+
+    // 스터디 멤버 목록 조회 (User 정보까지 한 번에 가져오기)
+    @Query("SELECT sm FROM StudyMember sm JOIN FETCH sm.user u WHERE sm.study.id = :studyId ORDER BY sm.role ASC, sm.createdAt ASC")
+    List<StudyMember> findByStudyIdWithUser(@Param("studyId") Integer studyId);
 }

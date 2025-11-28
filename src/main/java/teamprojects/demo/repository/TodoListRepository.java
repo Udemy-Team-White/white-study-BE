@@ -14,4 +14,6 @@ public interface TodoListRepository extends JpaRepository<TodoList, Integer> {
     // (API 5-2: 특정 날짜의 TODO 목록 조회 시 사용)
     List<TodoList> findByUserAndStudyAndTargetDateBetween(User user, Study study, LocalDateTime startOfDay, LocalDateTime endOfDay);
 
+    // api 5-8
+    List<TodoList> findByStudy(Study study);
 }

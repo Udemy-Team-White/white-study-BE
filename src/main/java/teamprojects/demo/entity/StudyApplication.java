@@ -53,4 +53,9 @@ public class StudyApplication {
         APPROVED,   // 승인됨
         REJECTED    // 거절됨
     }
+
+    // StudyApplication.java
+    public void updateStatus(ApplicationStatus status) {
+        this.status = status;
+    }
 }

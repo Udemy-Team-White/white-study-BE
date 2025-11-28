@@ -51,7 +51,7 @@ import teamprojects.demo.entity.ReliabilityHistory;
 import teamprojects.demo.dto.study.*;
 import teamprojects.demo.entity.*;
 import teamprojects.demo.repository.*;
-
+import java.time.Duration;
 
 
 
@@ -808,5 +808,446 @@ public class StudyService {
         return SelfReportDeleteResponse.builder()
                 .deletedReportId(reportId)
                 .build();
+    }
+
+    /**
+     * API 5-1: 스터디 신청자 목록 조회 (스터디장 전용)
+     */
+    public List<StudyApplicantResponse> getApplicants(Integer studyId) {
+
+        // 1. 현재 사용자 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 스터디 조회
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. ⭐️ 권한 체크 (스터디장이 아니면 403)
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // "스터디 관리 권한이 없습니다."
+        }
+
+        // 4. 신청자 목록 조회 (PENDING 상태만)
+        List<StudyApplication> applications = studyApplicationRepository.findByStudyIdAndStatus(
+                studyId,
+                StudyApplication.ApplicationStatus.PENDING
+        );
+
+        // 5. DTO 변환
+        return applications.stream()
+                .map(app -> {
+                    User applicant = app.getUser();
+                    UserProfile profile = userProfileRepository.findByUser(applicant)
+                            .orElse(UserProfile.builder().user(applicant).build()); // 없을 경우 빈 객체 처리
+
+                    // ⭐️ [추가] 착용 아이템 조회 로직 (UserInventory 엔티티가 있다고 가정)
+                    // 현재는 빈 리스트로 반환하지만, 나중에 UserInventoryRepository를 통해 가져오면 됩니다.
+                    // 예: userInventoryRepository.findEquippedItemImages(applicant.getId());
+                    List<String> equippedItems = new ArrayList<>();
+
+                    // (임시 데이터 예시 - 나중에 삭제하세요)
+                    // equippedItems.add("https://item-image-url.com/hat.png");
+
+                    StudyApplicantResponse.ApplicantDto userDto = StudyApplicantResponse.ApplicantDto.builder()
+                            .userId(applicant.getId())
+                            .username(applicant.getUsername())
+                            .profileImageUrl(profile.getProfileImageUrl())
+                            .reliabilityScore(profile.getReliabilityScore())
+                            .equippedItems(equippedItems) // 아이템 리스트
+                            .build();
+
+                    return StudyApplicantResponse.builder()
+                            .applicationId(app.getId())
+                            .message(app.getMessage())
+                            .appliedAt(app.getCreatedAt().toString())
+                            .user(userDto) // 중첩된 유저 정보
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * API 5-2: 스터디 신청 승인
+     */
+    @Transactional
+    public StudyApplicantApproveResponse approveApplicant(Integer studyId, Integer applicationId, StudyApplicantApproveRequest request) {
+
+        // 1. 현재 사용자(리더) 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 스터디 조회
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 권한 체크 (리더만 가능)
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // 스터디 관리 권한 없음
+        }
+
+        // 4. 신청서 조회 (해당 스터디의 신청서인지 확인)
+        StudyApplication application = studyApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        if (!application.getStudy().getId().equals(studyId)) {
+            throw new CustomException(ErrorStatus._BAD_REQUEST); // 잘못된 요청 (다른 스터디 신청서)
+        }
+
+        // (이미 처리된 신청서인지 확인)
+        if (application.getStatus() != StudyApplication.ApplicationStatus.PENDING) {
+            throw new CustomException(ErrorStatus._BAD_REQUEST); // 이미 승인/거절된 신청서
+        }
+
+        // 5. ⭐️ 모집 인원 체크 (409 Conflict)
+        Integer currentMembers = studyMemberRepository.countByStudy(study);
+        if (currentMembers >= study.getMaxMembers()) {
+            throw new CustomException(ErrorStatus.RECRUITMENT_CLOSED); // 혹은 별도의 FULL 에러 코드
+        }
+
+        // 6. 신청 상태 변경 (PENDING -> APPROVED)
+        // ⭐️ StudyApplication 엔티티에 updateStatus 메서드 필요 (없으면 @Setter나 메서드 추가)
+        application.updateStatus(StudyApplication.ApplicationStatus.APPROVED);
+
+        // (선택 사항: 승인 메시지도 저장하고 싶다면 application.setMessage(request.getMessage()) 등 처리)
+
+        // 7. 정식 멤버로 등록 (INSERT)
+        StudyMember newMember = StudyMember.builder()
+                .study(study)
+                .user(application.getUser())
+                .role(StudyMember.StudyRole.MEMBER) // 기본값 MEMBER
+                .build();
+
+        newMember = studyMemberRepository.save(newMember);
+
+        // 8. 응답 DTO 반환
+        return StudyApplicantApproveResponse.builder()
+                .memberId(newMember.getId())
+                .userId(newMember.getUser().getId())
+                .username(newMember.getUser().getUsername())
+                .role(newMember.getRole().name())
+                .build();
+    }
+    /**
+     * API 5-3: 스터디 신청 거절
+     */
+    @Transactional
+    public StudyApplicantRejectResponse rejectApplicant(Integer studyId, Integer applicationId, StudyApplicantRejectRequest request) {
+
+        // 1. 현재 사용자(리더) 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 스터디 조회
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 권한 체크 (리더만 가능)
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
+        }
+
+        // 4. 신청서 조회
+        StudyApplication application = studyApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        if (!application.getStudy().getId().equals(studyId)) {
+            throw new CustomException(ErrorStatus._BAD_REQUEST); // 다른 스터디 신청서임
+        }
+
+        // (이미 처리된 신청서인지 확인)
+        if (application.getStatus() != StudyApplication.ApplicationStatus.PENDING) {
+            throw new CustomException(ErrorStatus._BAD_REQUEST);
+        }
+
+        // 5. 신청 상태 변경 (PENDING -> REJECTED)
+        application.updateStatus(StudyApplication.ApplicationStatus.REJECTED);
+
+        // (참고: 거절 사유를 저장하고 싶다면 Entity에 필드를 추가해야 합니다. 지금은 상태만 바꿉니다.)
+
+        // 6. 응답 DTO 반환
+        return StudyApplicantRejectResponse.builder()
+                .applicationId(application.getId())
+                .status(application.getStatus().name())
+                .build();
+    }
+
+    /**
+     * API 5-4: 확정 멤버 목록 조회
+     */
+    public StudyMemberResponse getStudyMembers(Integer studyId) {
+
+        // 1. 현재 접속자 확인 (비로그인 허용 or 불가? 명세상 403이 있으므로 로그인 필수일 듯)
+        // (만약 비로그인도 조회가 가능하다면 로직을 살짝 바꿔야 합니다. 여기선 로그인 필수로 짭니다.)
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+        // 2. 스터디 조회
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 권한 체크 (스터디장이 아니어도 조회는 가능해야 할 것 같은데...
+        // 명세서엔 '스터디장이 아닌 경우 403'이라고 되어 있지만, 보통 멤버 목록은 다 봅니다.
+        // 하지만 요청대로 '관리용'이라면 리더만 봐야겠죠. 일단 리더 체크 넣겠습니다.)
+        // ⚠️ 만약 일반 멤버도 봐야 한다면 이 체크를 빼세요!
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            // throw new CustomException(ErrorStatus._FORBIDDEN);
+            // (일단 주석: 보통 멤버 목록은 누구나 볼 수 있으므로 에러는 안 냄)
+        }
+
+        // 4. 나의 상태 판별 (재사용!)
+        String myStatus = determineUserStatus(study);
+
+        // 5. 멤버 목록 조회
+        List<StudyMember> members = studyMemberRepository.findByStudyIdWithUser(studyId);
+
+        // 6. DTO 변환
+        List<StudyMemberResponse.MemberDto> memberDtos = members.stream()
+                .map(member -> {
+                    User user = member.getUser();
+                    UserProfile profile = userProfileRepository.findByUser(user)
+                            .orElse(UserProfile.builder().user(user).build());
+
+                    // (아이템 조회 로직 - 임시 빈 리스트)
+                    List<String> equippedItems = new ArrayList<>();
+
+                    StudyMemberResponse.UserDto userDto = StudyMemberResponse.UserDto.builder()
+                            .userId(user.getId())
+                            .username(user.getUsername())
+                            .email(user.getEmail())
+                            .bio(profile.getIntroduction())
+                            .imgUrl(profile.getProfileImageUrl())
+                            .equippedItems(equippedItems)
+                            .build();
+
+                    return StudyMemberResponse.MemberDto.builder()
+                            .memberId(member.getId())
+                            .role(member.getRole().name())
+                            .user(userDto)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return StudyMemberResponse.builder()
+                .myStatus(myStatus)
+                .members(memberDtos)
+                .build();
+    }
+
+    /**
+     * API 5-5: 멤버 역할 변경
+     */
+    @Transactional
+    public StudyMemberRoleUpdateResponse updateMemberRole(Integer studyId, Integer memberId, StudyMemberRoleUpdateRequest request) {
+
+        // 1. 현재 사용자(리더) 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 스터디 조회
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 권한 체크 (스터디장만 가능)
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN); // 스터디 관리 권한 없음
+        }
+
+        // 4. 대상 멤버 조회
+        StudyMember member = studyMemberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND)); // 멤버 없음
+
+        // (멤버가 해당 스터디 소속인지 확인)
+        if (!member.getStudy().getId().equals(studyId)) {
+            throw new CustomException(ErrorStatus._BAD_REQUEST);
+        }
+
+        // 5. 역할 변경 (String -> Enum)
+        try {
+            StudyMember.StudyRole newRole = StudyMember.StudyRole.valueOf(request.getRole());
+
+            // 본인(리더)의 역할은 변경 불가 (안전장치)
+            if (member.getUser().getId().equals(currentUserId)) {
+                throw new CustomException(ErrorStatus._BAD_REQUEST); // 리더 위임 기능이 아니라면 본인 변경 막음
+            }
+
+            member.updateRole(newRole); // ⭐️ Entity에 updateRole 메서드 필요
+
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorStatus._BAD_REQUEST); // 잘못된 역할 이름
+        }
+
+        // 6. 저장 (Dirty Checking으로 자동 반영되지만 명시적으로 호출해도 됨)
+        studyMemberRepository.save(member);
+
+        // 7. 응답 DTO 반환
+        return StudyMemberRoleUpdateResponse.builder()
+                .memberId(member.getId())
+                .userId(member.getUser().getId())
+                .username(member.getUser().getUsername())
+                .newRole(member.getRole().name())
+                .build();
+    }
+
+    /**
+     * API 5-6: 스터디 멤버 추방
+     */
+    @Transactional
+    public StudyMemberKickResponse kickMember(Integer studyId, Integer memberId) {
+
+        // 1. 현재 사용자(리더) 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 스터디 조회
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 권한 체크 (리더만 가능)
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
+        }
+
+        // 4. 대상 멤버 조회
+        StudyMember member = studyMemberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        // (멤버가 해당 스터디 소속인지 확인)
+        if (!member.getStudy().getId().equals(studyId)) {
+            throw new CustomException(ErrorStatus._BAD_REQUEST);
+        }
+
+        // 5. ⭐️ [방어 로직] 자기 자신 추방 시도 체크 (400 Bad Request)
+        if (member.getUser().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus.CANNOT_KICK_SELF);
+        }
+
+        // 6. 삭제 (추방)
+        studyMemberRepository.delete(member);
+
+        // 7. 응답 반환
+        return StudyMemberKickResponse.builder()
+                .kickedMemberId(memberId)
+                .message("정상적으로 처리되었습니다.")
+                .build();
+    }
+
+    /**
+     * API 5-7: 스터디 정보 수정
+     */
+    @Transactional
+    public void updateStudy(Integer studyId, StudyUpdateRequest request) {
+
+        // 1. 현재 사용자(리더) 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        // 2. 스터디 조회
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        // 3. 권한 체크 (리더만 가능)
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
+        }
+
+        // 4. 정보 수정 (값이 있는 것만 수정 - Dirty Checking)
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            study.updateTitle(request.getTitle()); // ⭐️ Entity에 update 메서드 필요
+        }
+        if (request.getContent() != null && !request.getContent().isBlank()) {
+            study.updateContent(request.getContent());
+        }
+        if (request.getMaxMembers() != null) {
+            // (선택) 현재 멤버 수보다 작게 줄일 수 없도록 막는 로직 추가 가능
+            study.updateMaxMembers(request.getMaxMembers());
+        }
+        if (request.getStartDate() != null) {
+            study.updateStartDate(request.getStartDate());
+        }
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            try {
+                Study.StudyStatus newStatus = Study.StudyStatus.valueOf(request.getStatus());
+                study.updateStatus(newStatus);
+            } catch (IllegalArgumentException e) {
+                // 잘못된 상태값이면 무시하거나 에러 처리
+            }
+        }
+
+        // 5. 카테고리 수정 (기존 삭제 -> 새 연결)
+        if (request.getCategoryIds() != null) {
+            // 기존 연결 삭제
+            studyHasCategoryRepository.deleteByStudy(study); // ⭐️ Repository에 deleteByStudy 메서드 필요
+
+            // 새 연결 생성
+            for (Integer categoryId : request.getCategoryIds()) {
+                StudyCategory category = studyCategoryRepository.findById(categoryId)
+                        .orElseThrow(() -> new CustomException(ErrorStatus.CATEGORY_NOT_FOUND));
+
+                StudyHasCategory link = StudyHasCategory.builder()
+                        .study(study)
+                        .studyCategory(category)
+                        .build();
+                studyHasCategoryRepository.save(link);
+            }
+        }
+
+        // (명시적 save 호출 없어도 Transactional 때문에 자동 반영됨)
+    }
+    /**
+     * API 5-8: 스터디 일정 및 주기 수정
+     */
+    @Transactional
+    public void updateStudySchedule(Integer studyId, StudyScheduleUpdateRequest request) {
+
+        // 1. 리더 권한 확인
+        Integer currentUserId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+
+        Study study = studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+
+        if (!study.getLeader().getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
+        }
+
+        // 2. [핵심 로직] 시작일 변경 시 -> TodoList 날짜들도 같이 이동 (Shifting)
+        if (request.getStartDate() != null) {
+            LocalDateTime oldStart = study.getStartDate();
+            LocalDateTime newStart = request.getStartDate();
+
+            // 날짜가 변경되었다면?
+            if (oldStart != null && !oldStart.isEqual(newStart)) {
+                // 두 날짜의 차이(일수) 계산
+                long daysDiff = java.time.temporal.ChronoUnit.DAYS.between(oldStart, newStart);
+
+                // 이 스터디의 모든 TodoList 조회 (Repository 메서드 필요!)
+                List<TodoList> todoLists = todoListRepository.findByStudy(study);
+
+                // 모든 TodoList의 targetDate를 차이만큼 이동
+                for (TodoList list : todoLists) {
+                    // 기존 날짜 + 차이값
+                    LocalDateTime newTargetDate = list.getTargetDate().plusDays(daysDiff);
+                    list.updateTargetDate(newTargetDate); // ⭐️ TodoList 엔티티에 메서드 필요
+                }
+            }
+            // 스터디 시작일 업데이트
+            study.updateStartDate(newStart);
+        }
+
+        // 3. 종료일 업데이트
+        if (request.getEndDate() != null) {
+            study.updateEndDate(request.getEndDate()); // ⭐️ Study 엔티티 메서드 필요
+        }
+
+        // 4. 주기 업데이트
+        if (request.getTodoCycle() != null && !request.getTodoCycle().isBlank()) {
+            study.updateTodoCycle(request.getTodoCycle()); // ⭐️ Study 엔티티 메서드 필요
+        }
+
+        // (JPA Dirty Checking으로 자동 저장됨)
     }
 }

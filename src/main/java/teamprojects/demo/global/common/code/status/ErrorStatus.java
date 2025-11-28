@@ -28,7 +28,7 @@ public enum ErrorStatus implements BaseErrorCode {
     // 2. 모집 마감된 스터디에 신청 시도 (400 Bad Request)
     RECRUITMENT_CLOSED(HttpStatus.BAD_REQUEST, 400, "모집이 마감된 스터디입니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, 400, "현재 비밀번호가 일치하지 않습니다."),
-
+    CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, 400, "스터디장은 스스로를 추방할 수 없습니다."),
 
     _FORBIDDEN(HttpStatus.FORBIDDEN, 403, "접근 권한이 없습니다."),
 

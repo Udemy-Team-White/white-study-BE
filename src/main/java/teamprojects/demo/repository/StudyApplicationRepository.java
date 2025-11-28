@@ -31,4 +31,13 @@ public interface StudyApplicationRepository extends JpaRepository<StudyApplicati
 
     //유저와 스터디 정보로 신청 내역 리스트를 가져오는 메서드
     List<StudyApplication> findByUserAndStudy(User user, Study study);
+
+    // 특정 스터디의 특정 상태(PENDING)인 신청서 목록 조회
+    // 최신순 정렬 (신청일 내림차순)
+    @Query("SELECT sa FROM StudyApplication sa " +
+            "JOIN FETCH sa.user u " + // N+1 문제 방지를 위해 User도 같이 가져옴
+            "WHERE sa.study.id = :studyId AND sa.status = :status " +
+            "ORDER BY sa.createdAt DESC")
+    List<StudyApplication> findByStudyIdAndStatus(@Param("studyId") Integer studyId,
+                                                  @Param("status") StudyApplication.ApplicationStatus status);
 }

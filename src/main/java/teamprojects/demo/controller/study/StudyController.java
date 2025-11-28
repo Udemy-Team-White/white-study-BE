@@ -28,6 +28,11 @@ import teamprojects.demo.dto.study.TodoListCreateResponse;
 import teamprojects.demo.dto.study.StudyDashboardResponse;
 import teamprojects.demo.service.user.UserService;
 import teamprojects.demo.dto.study.*;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+import java.util.HashMap;
+import teamprojects.demo.dto.study.StudyScheduleUpdateRequest;
 
 @RestController // ⭐️ REST API 컨트롤러
 @RequiredArgsConstructor
@@ -194,5 +199,128 @@ public class StudyController {
         SelfReportListResponse responseDto = studyService.getSelfReportList(studyId, request);
 
         return ApiResponse.onSuccess(responseDto, "셀프 보고서 목록 조회 성공");
+    }
+
+    /**
+     * API 5-1: 스터디 신청자 목록 조회
+     * URL: GET /api/studies/{studyId}/applicants
+     * (스터디장만 가능)
+     */
+    @GetMapping("/{studyId}/applicants")
+    public ApiResponse<List<StudyApplicantResponse>> getApplicants(
+            @PathVariable Integer studyId) {
+
+        // (Status는 PENDING 고정이므로 파라미터로 안 받아도 됨)
+        List<StudyApplicantResponse> responseDto = studyService.getApplicants(studyId);
+
+        return ApiResponse.onSuccess(responseDto, "신청자 목록 조회 성공");
+    }
+
+    /**
+     * API 5-2: 스터디 신청 승인
+     * URL: POST /api/studies/{studyId}/applicants/{applicationId}/approve
+     */
+    @PostMapping("/{studyId}/applicants/{applicationId}/approve")
+    public ApiResponse<StudyApplicantApproveResponse> approveApplicant(
+            @PathVariable Integer studyId,
+            @PathVariable Integer applicationId,
+            @RequestBody(required = false) StudyApplicantApproveRequest request) { // Body는 선택 사항
+
+        // request가 null일 경우를 대비해 빈 객체 생성
+        if (request == null) request = new StudyApplicantApproveRequest();
+
+        StudyApplicantApproveResponse responseDto = studyService.approveApplicant(studyId, applicationId, request);
+
+        return ApiResponse.onSuccess(responseDto, "신청이 승인되었습니다. 새 멤버로 추가되었습니다.");
+    }
+
+    /**
+     * API 5-3: 스터디 신청 거절
+     * URL: POST /api/studies/{studyId}/applicants/{applicationId}/reject
+     */
+    @PostMapping("/{studyId}/applicants/{applicationId}/reject")
+    public ApiResponse<StudyApplicantRejectResponse> rejectApplicant(
+            @PathVariable Integer studyId,
+            @PathVariable Integer applicationId,
+            @RequestBody(required = false) StudyApplicantRejectRequest request) {
+
+        if (request == null) request = new StudyApplicantRejectRequest();
+
+        StudyApplicantRejectResponse responseDto = studyService.rejectApplicant(studyId, applicationId, request);
+
+        return ApiResponse.onSuccess(responseDto, "신청이 거절되었습니다.");
+    }
+
+    /**
+     * API 5-4: 확정 멤버 목록 조회
+     * URL: GET /api/studies/{studyId}/members
+     */
+    @GetMapping("/{studyId}/members")
+    public ApiResponse<StudyMemberResponse> getStudyMembers(@PathVariable Integer studyId) {
+
+        StudyMemberResponse responseDto = studyService.getStudyMembers(studyId);
+
+        return ApiResponse.onSuccess(responseDto, "확정 멤버 목록 조회 성공");
+    }
+
+    /**
+     * API 5-5: 멤버 역할 변경
+     * URL: PATCH /api/studies/{studyId}/members/{memberId}
+     */
+    @PatchMapping("/{studyId}/members/{memberId}")
+    public ApiResponse<StudyMemberRoleUpdateResponse> updateMemberRole(
+            @PathVariable Integer studyId,
+            @PathVariable Integer memberId,
+            @Valid @RequestBody StudyMemberRoleUpdateRequest request) {
+
+        StudyMemberRoleUpdateResponse responseDto = studyService.updateMemberRole(studyId, memberId, request);
+
+        return ApiResponse.onSuccess(responseDto, "멤버 역할이 성공적으로 변경되었습니다.");
+    }
+
+    /**
+     * API 5-6: 스터디 멤버 추방
+     * URL: DELETE /api/studies/{studyId}/members/{memberId}
+     */
+    @DeleteMapping("/{studyId}/members/{memberId}")
+    public ApiResponse<StudyMemberKickResponse> kickMember(
+            @PathVariable Integer studyId,
+            @PathVariable Integer memberId) {
+
+        StudyMemberKickResponse responseDto = studyService.kickMember(studyId, memberId);
+
+        return ApiResponse.onSuccess(responseDto, "멤버를 스터디에서 추방했습니다.");
+    }
+
+    /**
+     * API 5-7: 스터디 정보 수정
+     * URL: POST /api/studies/{studyId} (팀원 요청으로 POST 사용)
+     */
+    @PostMapping("/{studyId}")
+    public ApiResponse<Map<String, Integer>> updateStudy(
+            @PathVariable Integer studyId,
+            @RequestBody StudyUpdateRequest request) {
+
+        studyService.updateStudy(studyId, request);
+
+        // 응답 데이터 생성
+        Map<String, Integer> data = new HashMap<>();
+        data.put("studyId", studyId);
+
+        return ApiResponse.onSuccess(data, "스터디 정보가 성공적으로 수정되었습니다.");
+    }
+
+    /**
+     * API 5-8: 스터디 일정 및 주기 수정
+     * URL: PATCH /api/studies/{studyId}/schedule
+     */
+    @PatchMapping("/{studyId}/schedule")
+    public ApiResponse<String> updateStudySchedule(
+            @PathVariable Integer studyId,
+            @RequestBody StudyScheduleUpdateRequest request) {
+
+        studyService.updateStudySchedule(studyId, request);
+
+        return ApiResponse.onSuccess("스터디 일정 및 주기가 수정되었습니다.");
     }
 }

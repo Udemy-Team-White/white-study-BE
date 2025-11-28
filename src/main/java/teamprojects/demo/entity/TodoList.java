@@ -52,4 +52,5 @@ public class TodoList {
         this.title = title;
         this.targetDate = targetDate;
     }
+    public void updateTargetDate(LocalDateTime targetDate) { this.targetDate = targetDate; }
 }

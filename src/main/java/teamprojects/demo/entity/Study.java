@@ -74,6 +74,25 @@ public class Study {
     @Builder.Default // 빌더 패턴 사용 시 초기화 유지
     private List<StudyMember> studyMembers = new ArrayList<>();
 
+    public void updateTitle(String title) {
+        this.title = title;
+        this.studyName = title; // (아까 studyName 필드를 지웠으면 이 줄은 필요 없음)
+    }
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
+    public void updateMaxMembers(Integer maxMembers) {
+        this.maxMembers = maxMembers;
+    }
+
+    public void updateStartDate(LocalDateTime startDate) {
+        this.startDate = startDate;
+    }
+
+    public void updateStatus(StudyStatus status) {
+        this.status = status;
+    }
 
     // 1. 스터디 진행 방식 Enum (studyType 필드에서 사용)
     public enum StudyType {
@@ -85,19 +104,20 @@ public class Study {
     // 2. 스터디 모집 상태 Enum (status 필드에서 사용)
     public enum StudyStatus {
         RECRUITING,          // 모집 중
-        RECRUITMENT_CLOSED,  // 모집 마감 (모집 인원 도달 또는 마감일 초과)
-        IN_PROGRESS,         // 스터디 진행 중 (선택적)
-        FINISHED,          // 스터디 종료 (선택적)
-        RECRUITING_IN_PROGRESS
+        RECRUITMENT_CLOSED,  // 모집 마감
+        IN_PROGRESS,         // 진행 중
+        FINISHED,          // 종료
+        RECRUITING_IN_PROGRESS // 진행 중 & 추가 모집
     }
 
-    // 3. (참고) StudyMember 엔티티에서 사용될 Enum (스터디장 등록 시 필요)
+    // 3. 멤버 역할 Enum
     public enum StudyRole {
         LEADER,     // 스터디장
         MEMBER      // 일반 멤버
     }
     public Integer getCurrentMembers() {
-        // studyMembers 리스트의 크기를 반환합니다.
         return this.studyMembers.size();
     }
+    public void updateEndDate(LocalDateTime endDate) { this.endDate = endDate; }
+    public void updateTodoCycle(String todoCycle) { this.todoCycle = todoCycle; }
 }

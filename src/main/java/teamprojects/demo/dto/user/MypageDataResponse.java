@@ -31,7 +31,8 @@ public class MypageDataResponse {
         private String username;
         private String email;
         private String bio;     // UserProfile의 introduction 필드를 bio로 매핑 가정
-        private String imgUrl;  // UserProfile의 profileImageUrl 필드를 imgUrl로 매핑 가정
+        private String imgUrl;
+        private List<String> equippedItems;// UserProfile의 profileImageUrl 필드를 imgUrl로 매핑 가정
     }
 
     @Getter

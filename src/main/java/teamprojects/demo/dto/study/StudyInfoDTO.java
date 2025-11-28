@@ -16,4 +16,7 @@ public class StudyInfoDTO {
     private Integer studyId;
     private String studyName;
     private String status;
+    private String startDate;
+    private String endDate;
+    private String myRole;
 }

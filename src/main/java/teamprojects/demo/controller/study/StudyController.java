@@ -153,20 +153,14 @@ public class StudyController {
     /**
      * API 4-3: TODO 플래너(그룹) 생성
      * URL: POST /api/studies/{studyId}/todo-lists
-     * (로그인 필요, 스터디 멤버만 가능)
-     * @param studyId (Path Variable)
-     * @param request (JSON Body: targetDate, title)
-     * @return 201 Created (TodoListCreateResponse)
      */
     @PostMapping("/{studyId}/todo-lists")
     public ApiResponse<TodoListCreateResponse> createTodoList(
             @PathVariable Integer studyId,
-            @Valid @RequestBody TodoListCreateRequest request) {
+            @RequestBody TodoListCreateRequest request) { // Valid 제거 가능 (필수값이 없으므로)
 
-        // 1. StudyService의 생성 메서드 호출
         TodoListCreateResponse responseDto = studyService.createTodoList(studyId, request);
 
-        // 2. 201 Created 응답 반환
         return ApiResponse.onCreated(responseDto);
     }
     /**

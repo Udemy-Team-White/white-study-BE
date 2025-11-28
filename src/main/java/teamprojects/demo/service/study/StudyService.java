@@ -51,6 +51,7 @@ import teamprojects.demo.entity.ReliabilityHistory;
 import teamprojects.demo.dto.study.*;
 import teamprojects.demo.entity.*;
 import teamprojects.demo.repository.*;
+import teamprojects.demo.repository.PointHistoryRepository;
 import java.time.Duration;
 
 
@@ -71,7 +72,7 @@ public class StudyService {
     private final TodoItemRepository todoItemRepository;
     private final SelfReportRepository selfReportRepository;
     private final ReliabilityHistoryRepository reliabilityHistoryRepository;
-
+    private final PointHistoryRepository pointHistoryRepository;
 
     public List<CategoryResponse> getAllCategories() {
         return studyCategoryRepository.findAll().stream()
@@ -377,11 +378,10 @@ public class StudyService {
                 .build();
     }
     /**
-     * API 3-2: TODO 플래너 조회 (날짜별)
-     * 님의 TodoListRepository 메서드(Between)에 맞춰 수정되었습니다.
+     * API 4-2: TODO 플래너 조회 (수정: 사이클 자동 계산 및 추가 정보 반환)
      */
     @Transactional(readOnly = true)
-    public List<TodoPlannerResponse> getStudyTodos(Integer studyId, LocalDate targetDate) {
+    public List<TodoPlannerResponse> getStudyTodos(Integer studyId, LocalDate requestDate) {
 
         // 1. 현재 사용자 확인
         Integer currentUserId = SecurityUtils.getCurrentUserId()
@@ -396,77 +396,123 @@ public class StudyService {
 
         // 3. 멤버 자격 확인
         if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
-            throw new CustomException(ErrorStatus.STUDY_NOT_FOUND); // 또는 403 Forbidden
+            throw new CustomException(ErrorStatus.STUDY_NOT_FOUND); // 권한 없음
         }
 
-        // 4. ⭐️ [수정됨] 날짜 범위 계산 (LocalDate -> LocalDateTime Start/End)
-        // 예: 2025-11-15 -> 2025-11-15 00:00:00 ~ 2025-11-15 23:59:59
-        LocalDateTime startOfDay = targetDate.atStartOfDay();
-        LocalDateTime endOfDay = targetDate.atTime(23, 59, 59);
+        // ⭐️ [수정] 4. 사이클에 따른 '검색 기준 날짜' 계산
+        LocalDate searchDate = requestDate; // 기본은 요청 날짜 그대로
 
-        // 5. ⭐️ [수정됨] Repository 호출 (파라미터 순서: User, Study, Start, End)
+        // 만약 스터디 주기가 'WEEKLY'라면? -> "그 주의 월요일"로 강제 변경!
+        // (프론트가 목요일을 보내도, 백엔드는 월요일 날짜로 저장된 TODO를 찾습니다)
+        if ("WEEKLY".equalsIgnoreCase(study.getTodoCycle())) {
+            searchDate = requestDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        }
+        // (필요 시 MONTHLY 등 다른 주기 로직 추가 가능)
+
+        // 5. DB 조회 (계산된 날짜 searchDate로 조회!)
+        // 하루 전체 범위 (00:00:00 ~ 23:59:59)
+        LocalDateTime startOfDay = searchDate.atStartOfDay();
+        LocalDateTime endOfDay = searchDate.atTime(23, 59, 59);
+
         List<TodoList> todoLists = todoListRepository.findByUserAndStudyAndTargetDateBetween(
                 currentUser, study, startOfDay, endOfDay);
 
-        // 6. 응답 DTO 변환
+        // 6. 응답 DTO 변환 (추가 정보 포함)
+        // 람다식 내부에서 쓰기 위해 final 변수로 복사
+        LocalDate finalCycleStartDate = searchDate;
+
         return todoLists.stream()
                 .map(todoList -> {
-                    // ⭐️ [수정] getItems() -> getTodoItems() 로 변경!
                     List<TodoPlannerResponse.TodoItemDto> itemDtos = todoList.getTodoItems().stream()
                             .map(todoItem -> TodoPlannerResponse.TodoItemDto.builder()
                                     .todoItemId(todoItem.getId())
                                     .content(todoItem.getContent())
-                                    .isCompleted(todoItem.getIsCompleted()) // (참고: TodoItem 엔티티 필드명 확인 필요)
+                                    .isCompleted(todoItem.getIsCompleted())
                                     .build())
                             .collect(Collectors.toList());
 
                     return TodoPlannerResponse.builder()
                             .todoListId(todoList.getId())
                             .title(todoList.getTitle())
+
+                            // ⭐️ [추가된 필드들]
+                            .cycleStartDate(finalCycleStartDate.toString()) // 계산된 사이클 시작일 (ex: 월요일)
+                            .targetDate(todoList.getTargetDate().toLocalDate().toString()) // 실제 DB 저장 날짜
+                            .createdDate(todoList.getCreatedAt().toLocalDate().toString()) // 생성일
+
                             .items(itemDtos)
                             .build();
                 })
                 .collect(Collectors.toList());
     }
+
+    /**
+     * API 4-3: TODO 플래너(그룹) 생성 (수정: 날짜 자동 계산 로직 적용)
+     */
     @Transactional
     public TodoListCreateResponse createTodoList(Integer studyId, TodoListCreateRequest request) {
 
-        // 1. 현재 로그인 사용자 확인 (401 Unauthorized)
+        // 1. 유저 & 스터디 확인 (권한 체크)
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
-
-        // 2. 스터디 존재 확인 (404)
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 3. 스터디 멤버 자격 확인 (404/403 - 멤버만 TODO를 생성할 수 있음)
-        // ⭐️ StudyMemberRepository에 existsByUserAndStudy 메서드가 있어야 합니다.
         if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
-            // 멤버가 아니면 404를 반환하여 권한 없음/정보 없음으로 처리합니다.
-            throw new CustomException(ErrorStatus.STUDY_NOT_FOUND);
+            throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // 4. TodoList Entity 생성 및 저장
+        // 2. ⭐️ [핵심] 다음 targetDate 자동 계산
+        LocalDateTime nextTargetDate;
+
+        // (1) 요청에 날짜가 있으면 그걸 우선 사용 (강제 지정 기능)
+        if (request.getTargetDate() != null) {
+            nextTargetDate = request.getTargetDate();
+        }
+        // (2) 요청에 날짜가 없으면(null) 자동 계산
+        else {
+            // DB에서 가장 최근 TodoList 조회
+            TodoList lastTodoList = todoListRepository.findTop1ByUserAndStudyOrderByTargetDateDesc(currentUser, study)
+                    .orElse(null);
+
+            if (lastTodoList == null) {
+                // 처음 만드는 거라면? -> 스터디 시작일 기준 (시작일 없으면 오늘)
+                nextTargetDate = study.getStartDate() != null ? study.getStartDate() : LocalDateTime.now();
+            } else {
+                // 이미 있다면? -> 마지막 날짜 + 주기 (일단 WEEKLY 기준 7일 추가)
+                // (나중에 study.getTodoCycle() 값에 따라 1일/7일 분기 처리가능)
+                nextTargetDate = lastTodoList.getTargetDate().plusWeeks(1);
+            }
+        }
+
+        // 3. 제목 자동 생성 (요청 없으면)
+        String title = request.getTitle();
+        if (title == null || title.isBlank()) {
+            // 예: "2025-11-28 목표" 처럼 날짜를 제목으로 자동 설정
+            title = nextTargetDate.toLocalDate().toString() + " 목표";
+        }
+
+        // 4. 저장
         TodoList newTodoList = TodoList.builder()
                 .study(study)
                 .user(currentUser)
-                .title(request.getTitle()) // Optional 제목
-                .targetDate(request.getTargetDate()) // 필수 날짜
+                .title(title)
+                .targetDate(nextTargetDate) // ⭐️ 자동 계산된 날짜 저장
                 .build();
 
         newTodoList = todoListRepository.save(newTodoList);
 
-        // 5. 응답 DTO 반환 (빈 items 리스트와 함께 반환)
+        // 5. 응답 DTO 반환 (items는 빈 리스트)
         return TodoListCreateResponse.builder()
                 .todoListId(newTodoList.getId())
                 .title(newTodoList.getTitle())
                 .targetDate(newTodoList.getTargetDate())
-                .items(new ArrayList<>()) // 생성 시에는 항상 빈 목록 반환
+                .items(new ArrayList<>())
                 .build();
     }
+
     /**
      * API 4-4: TODO 항목 생성 로직 (Service)
      * listId: Path Variable로 받은 TodoList ID
@@ -505,32 +551,87 @@ public class StudyService {
                 .build();
     }
     /**
-     * API 4-5: TODO 항목 상태 변경 (Service)
+     * API 4-5: TODO 항목 완료 상태 변경 (최종: 포인트 + 신뢰도 모두 처리)
      */
     @Transactional
     public TodoItemStatusResponse updateTodoItemStatus(Integer itemId, TodoItemUpdateRequest request) {
 
-        // 1. 현재 사용자 확인 (401 Unauthorized 방지)
+        // 1. 유저 확인
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
 
-        // 2. TodoItem 존재 확인 (404 Not Found)
+        // 2. 항목 조회
         TodoItem item = todoItemRepository.findById(itemId)
-                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND)); // 리소스가 없으면 404
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 3. 권한 확인 (본인 TodoList의 항목이 맞는지)
-        // TodoItem -> TodoList -> User (소유자)
-        if (!item.getTodoList().getUser().getId().equals(currentUserId)) {
-            throw new CustomException(ErrorStatus._FORBIDDEN); // 403 Forbidden 반환
+        // 3. 권한 체크
+        User user = item.getTodoList().getUser();
+        if (!user.getId().equals(currentUserId)) {
+            throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // 4. 상태 업데이트
-        item.setIsCompleted(request.getIsCompleted());
+        // ⭐️ [핵심 로직] 상태 변경에 따른 보상(포인트 & 신뢰도) 처리
+        boolean newStatus = request.getIsCompleted();
+        boolean oldStatus = item.getIsCompleted();
 
-        // 5. 저장 (save는 @Transactional 때문에 생략 가능하나 명시적으로 호출)
+        if (newStatus != oldStatus) {
+            UserProfile profile = userProfileRepository.findByUser(user)
+                    .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
+
+            int POINT_REWARD = 10;       // 포인트 보상
+            int RELIABILITY_REWARD = 2;  // ⭐️ 신뢰도 보상 (할 일 완료는 중요하니까 2점!)
+
+            if (newStatus) {
+                // (1) 완료 처리: 포인트 & 신뢰도 지급
+                profile.updatePoints(profile.getPoints() + POINT_REWARD);
+                profile.updateReliabilityScore(profile.getReliabilityScore() + RELIABILITY_REWARD); // ⭐️ 추가
+
+                // 내역 기록 (포인트)
+                PointHistory pHistory = PointHistory.builder()
+                        .user(user)
+                        .amount(POINT_REWARD)
+                        .reason("TODO 완료 보상")
+                        .build();
+                pointHistoryRepository.save(pHistory);
+
+                // ⭐️ 내역 기록 (신뢰도)
+                ReliabilityHistory rHistory = ReliabilityHistory.builder()
+                        .user(user)
+                        .changeAmount(RELIABILITY_REWARD)
+                        .reason("TODO 완료 보상")
+                        .build();
+                reliabilityHistoryRepository.save(rHistory);
+
+            } else {
+                // (2) 완료 취소: 포인트 & 신뢰도 회수
+                profile.updatePoints(profile.getPoints() - POINT_REWARD);
+                profile.updateReliabilityScore(profile.getReliabilityScore() - RELIABILITY_REWARD); // ⭐️ 추가
+
+                // 내역 기록 (포인트)
+                PointHistory pHistory = PointHistory.builder()
+                        .user(user)
+                        .amount(-POINT_REWARD)
+                        .reason("TODO 완료 취소")
+                        .build();
+                pointHistoryRepository.save(pHistory);
+
+                // ⭐️ 내역 기록 (신뢰도)
+                ReliabilityHistory rHistory = ReliabilityHistory.builder()
+                        .user(user)
+                        .changeAmount(-RELIABILITY_REWARD)
+                        .reason("TODO 완료 취소")
+                        .build();
+                reliabilityHistoryRepository.save(rHistory);
+            }
+
+            userProfileRepository.save(profile);
+        }
+
+        // 4. 상태 업데이트 및 저장
+        item.setIsCompleted(newStatus);
         todoItemRepository.save(item);
 
-        // 6. 응답 DTO 반환 (명세 반영)
+        // 5. 응답
         return TodoItemStatusResponse.builder()
                 .todoItemId(item.getId())
                 .isCompleted(item.getIsCompleted())

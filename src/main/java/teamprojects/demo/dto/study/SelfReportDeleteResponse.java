@@ -6,9 +6,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
-@Builder
 @NoArgsConstructor
-@AllArgsConstructor
 public class SelfReportDeleteResponse {
     private Integer deletedReportId;
+
+    @Builder
+    public SelfReportDeleteResponse(Integer deletedReportId) {
+        this.deletedReportId = deletedReportId;
+    }
 }

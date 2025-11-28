@@ -16,6 +16,7 @@ import teamprojects.demo.dto.auth.AuthLoginRequest;
 import teamprojects.demo.dto.auth.AuthLoginResponse;
 import teamprojects.demo.dto.auth.AuthCheckEmailResponse;
 
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.List;
 
@@ -115,7 +116,7 @@ public class UserService {
                 .user(savedUser)             // 방금 가입한 유저와 연결
                 .username(savedUser.getUsername()) // 닉네임 동일하게 설정
                 .points(0)                   // 초기 포인트 0
-                .reliabilityScore(0)         // 초기 신뢰도 0
+                .reliabilityScore(50)         // 초기 신뢰도 50
                 .introduction("안녕하세요! 함께 공부해요.")  // 기본 자기소개
                 .build();
 
@@ -209,18 +210,23 @@ public class UserService {
         UserProfile userProfile = userProfileRepository.findByUser(currentUser)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
 
+        // [추가] 착용 아이템 목록 가져오기 (아직 구현 전이므로 빈 리스트 처리)
+        // 나중에 UserInventoryRepository가 생기면 여기서 조회해서 넣으면 됩니다.
+        List<String> equippedItems = new ArrayList<>();
+
         // 2. Profile Info
         MypageDataResponse.ProfileInfoDto profileInfo = MypageDataResponse.ProfileInfoDto.builder()
                 .username(userProfile.getUsername())
                 .email(currentUser.getEmail()) // User 엔티티에 email 필드가 있다고 가정
                 .bio(userProfile.getIntroduction())
                 .imgUrl(userProfile.getProfileImageUrl())
+                .equippedItems(equippedItems)
                 .build();
 
         // 3. Activity Summary
 
         // 3-1. 진행 중/완료 스터디 수 조회
-        // ⭐️ [필수] StudyStatus Enum은 Study 엔티티에 있다고 가정합니다.
+        //  StudyStatus Enum은 Study 엔티티에 있다고 가정합니다.
         long inProgressCount = studyMemberRepository.countByUserAndStudyStatusIn(
                 currentUser,
                 List.of(Study.StudyStatus.RECRUITING, Study.StudyStatus.IN_PROGRESS)
@@ -231,7 +237,7 @@ public class UserService {
                 List.of(Study.StudyStatus.FINISHED, Study.StudyStatus.RECRUITMENT_CLOSED)
         );
 
-        // 3-2. 칭찬 요약 (⭐️ [가정] PraiseRepository를 사용한다고 가정합니다.)
+        // 3-2. 칭찬 요약 (PraiseRepository를 사용한다고 가정합니다.)
         // 실제 구현 시에는 PraiseRepository에 사용자 정의 쿼리(GROUP BY message)가 필요합니다.
         List<MypageDataResponse.PraiseDto> praiseDtos = List.of(); // 임시로 빈 목록 반환
         /*
@@ -483,51 +489,37 @@ public class UserService {
     }
 
     /**
-     * API 4-1: 스터디 대시보드 초기 데이터 조회 로직
-     * (권한 체크 및 다중 데이터 조합)
-     *
-     * @param studyId 조회할 스터디 ID
-     * @param userId  현재 로그인된 사용자 ID (인증 토큰에서 추출)
-     * @return StudyDashboardResponse (대시보드 최종 응답 DTO)
+     * API 4-1: 스터디 대시보드 초기 데이터 조회 로직 (최종 수정)
      */
     @Transactional(readOnly = true)
     public StudyDashboardResponse getDashboardData(Integer studyId, Integer userId) {
 
-        // 1. Repository 호출을 위한 User Entity 객체 획득
+        // 1. User 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
 
-        // 2. 핵심 데이터 조회 (Study Info)
+        // 2. Study 조회
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 3. 권한 체크 (403 Forbidden)
-        if (!studyMemberRepository.existsByUserAndStudy(user, study)) {
-            throw new CustomException(ErrorStatus._FORBIDDEN);
-        }
+        // 3. 권한 체크 및 내 멤버 정보 가져오기
+        // (단순 exists 체크 대신, 객체를 가져와서 myMemberInfo 변수에 담습니다.)
+        StudyMember myMemberInfo = studyMemberRepository.findByUserAndStudy(user, study)
+                .orElseThrow(() -> new CustomException(ErrorStatus._FORBIDDEN));
 
-        // 4. [요소 조회] 다음 스케줄 DateTime (ScheduleRepository 사용)
-        // ⭐️ findByStudy를 사용한 Service 로직으로 대체 (컴파일 오류 해결)
+        // 4. [요소 조회] 다음 스케줄
         List<Schedule> allSchedules = scheduleRepository.findByStudy(study);
-
-        // 🚨 주의: 스케줄 엔티티가 DayOfWeek + LocalTime 구조이므로,
-        // 다음 일정을 정확히 계산하려면 복잡한 Java Stream 로직이 필요합니다.
-        // 여기서는 컴파일 오류 해결을 위해, 현재 스터디의 모든 일정을 가져오는 코드로만 대체합니다.
-        // (실제 '다음 일정' 로직 구현은 Service 단에서 추가 작업이 필요합니다.)
         Optional<Schedule> nextScheduleOptional = allSchedules.stream()
-                // 임시로 가장 빠른 LocalTime을 가진 일정 중 하나를 선택합니다.
                 .filter(schedule -> schedule.getScheduleTime().isAfter(LocalTime.now()))
                 .findFirst();
 
-        // ⭐️ LocalTime과 LocalDate를 결합하여 String으로 변환 (타입 오류 해결)
         String nextScheduleDateTime = nextScheduleOptional
                 .map(Schedule::getScheduleTime)
                 .map(time -> LocalDateTime.of(LocalDate.now(), time))
                 .map(LocalDateTime::toString)
                 .orElse(null);
 
-
-        // 5. [요소 조회] 나의 오늘 진행 상황 (TodoItemRepository 사용)
+        // 5. [요소 조회] 나의 오늘 진행 상황
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(23, 59, 59);
@@ -537,23 +529,22 @@ public class UserService {
 
         Integer totalItems = totalItemsLong.intValue();
         Integer completedItems = completedItemsLong.intValue();
-
         Integer progressPercentage = (totalItems > 0) ? (int) (((double) completedItems / totalItems) * 100) : 100;
 
-
-        // 6. [요소 조회] 최근 보고서 (SelfReportRepository 사용)
+        // 6. [요소 조회] 최근 보고서
         List<SelfReport> reports = selfReportRepository.findTop3ByStudyOrderByCreatedAtDesc(study);
 
-        // 7. [요소 조회] 멤버 목록 (StudyMemberRepository 사용)
+        // 7. [요소 조회] 멤버 목록
         List<StudyMember> members = studyMemberRepository.findByStudy(study);
 
-
         // 8. DTO 매핑 및 조합
-
         StudyInfoDTO studyInfoDTO = StudyInfoDTO.builder()
                 .studyId(study.getId())
                 .studyName(study.getStudyName())
                 .status(study.getStatus().name())
+                .startDate(study.getStartDate() != null ? study.getStartDate().toString() : null)
+                .endDate(study.getEndDate() != null ? study.getEndDate().toString() : null)
+                .myRole(myMemberInfo.getRole().name())
                 .build();
 
         TodayProgressDTO progressDTO = TodayProgressDTO.builder()

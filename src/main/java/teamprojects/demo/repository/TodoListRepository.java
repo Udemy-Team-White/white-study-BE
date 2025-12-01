@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface TodoListRepository extends JpaRepository<TodoList, Integer> {
 
     // (API 5-2: 특정 날짜의 TODO 목록 조회 시 사용)
-    List<TodoList> findByUserAndStudyAndTargetDateBetween(User user, Study study, LocalDateTime startOfDay, LocalDateTime end);
+    Optional<TodoList> findFirstByUserAndStudyAndTargetDateBetween(User user, Study study, LocalDateTime start, LocalDateTime end);
 
     // api 5-8
     List<TodoList> findByStudy(Study study);

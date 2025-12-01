@@ -378,12 +378,12 @@ public class StudyService {
                 .build();
     }
     /**
-     * API 4-2: TODO 플래너 조회 (최종: 없으면 자동 생성 기능 추가)
+     * API 4-2: TODO 플래너 조회 (최종: 단일 객체 반환)
      */
-    @Transactional // ⭐️ [수정] 쓰기 작업(자동 생성)이 들어가므로 readOnly 제거!
-    public List<TodoPlannerResponse> getStudyTodos(Integer studyId, LocalDate requestDate) {
+    @Transactional
+    public TodoPlannerResponse getStudyTodos(Integer studyId, LocalDate requestDate) { // ⭐️ List 제거
 
-        // 1. 유저 & 스터디 확인
+        // 1. 유저 & 스터디 확인 (기존 동일)
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
         User currentUser = userRepository.findById(currentUserId)
@@ -395,64 +395,52 @@ public class StudyService {
             throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // 2. 사이클에 따른 '기준 날짜' 계산
+        // 2. 날짜 계산 (기존 동일)
         LocalDate searchDate = requestDate;
         if ("WEEKLY".equalsIgnoreCase(study.getTodoCycle())) {
             searchDate = requestDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
         }
 
-        // 3. DB 조회
         LocalDateTime startOfDay = searchDate.atStartOfDay();
         LocalDateTime endOfDay = searchDate.atTime(23, 59, 59);
 
-        // 반환받은 리스트가 불변일 수 있으므로, 수정 가능한 ArrayList로 감싸거나 새로 만듭니다.
-        List<TodoList> todoLists = new ArrayList<>(todoListRepository.findByUserAndStudyAndTargetDateBetween(
-                currentUser, study, startOfDay, endOfDay));
+        // 3. ⭐️ [핵심 변경] 단건 조회 및 처리
+        TodoList todoList = todoListRepository.findFirstByUserAndStudyAndTargetDateBetween(
+                        currentUser, study, startOfDay, endOfDay)
+                .orElse(null);
 
-        //  [핵심 추가] 조회 결과가 없으면 -> 자동 생성!
-        if (todoLists.isEmpty()) {
-            // 제목 자동 생성 (예: "2023-11-20 주차 목표")
+        // 없으면 생성!
+        if (todoList == null) {
             String defaultTitle = searchDate.toString() + " 주차 목표";
-
-            TodoList newList = TodoList.builder()
+            todoList = TodoList.builder()
                     .study(study)
                     .user(currentUser)
                     .title(defaultTitle)
-                    .targetDate(startOfDay) // 계산된 기준 날짜로 설정
+                    .targetDate(startOfDay)
                     .build();
-
-            // DB에 저장하고, 리스트에 추가 (이제 프론트는 빈 목록이 아닌 새 리스트를 받게 됨)
-            newList = todoListRepository.save(newList);
-            todoLists.add(newList);
+            todoList = todoListRepository.save(todoList);
         }
-        // ---------------------------------------------------------
 
-        // 4. DTO 변환
-        LocalDate finalCycleStartDate = searchDate;
+        // 4. DTO 변환 (리스트 반복문 없이 바로 변환!)
+        List<TodoItem> items = (todoList.getTodoItems() != null) ? todoList.getTodoItems() : new ArrayList<>();
 
-        return todoLists.stream()
-                .map(todoList -> {
-                    // (Null 방어) 아이템 리스트가 없으면 빈 리스트 처리
-                    List<TodoItem> items = (todoList.getTodoItems() != null) ? todoList.getTodoItems() : new ArrayList<>();
-
-                    List<TodoPlannerResponse.TodoItemDto> itemDtos = items.stream()
-                            .map(todoItem -> TodoPlannerResponse.TodoItemDto.builder()
-                                    .todoItemId(todoItem.getId())
-                                    .content(todoItem.getContent())
-                                    .isCompleted(todoItem.getIsCompleted())
-                                    .build())
-                            .collect(Collectors.toList());
-
-                    return TodoPlannerResponse.builder()
-                            .todoListId(todoList.getId())
-                            .title(todoList.getTitle())
-                            .cycleStartDate(finalCycleStartDate.toString())
-                            .targetDate(todoList.getTargetDate().toLocalDate().toString())
-                            .createdDate(todoList.getCreatedAt().toLocalDate().toString())
-                            .items(itemDtos)
-                            .build();
-                })
+        List<TodoPlannerResponse.TodoItemDto> itemDtos = items.stream()
+                .map(todoItem -> TodoPlannerResponse.TodoItemDto.builder()
+                        .todoItemId(todoItem.getId())
+                        .content(todoItem.getContent())
+                        .isCompleted(todoItem.getIsCompleted())
+                        .build())
                 .collect(Collectors.toList());
+
+        // ⭐️ 단일 객체 반환
+        return TodoPlannerResponse.builder()
+                .todoListId(todoList.getId())
+                .title(todoList.getTitle())
+                .cycleStartDate(searchDate.toString())
+                .targetDate(todoList.getTargetDate().toLocalDate().toString())
+                .createdDate(todoList.getCreatedAt().toLocalDate().toString())
+                .items(itemDtos)
+                .build();
     }
 
     /**

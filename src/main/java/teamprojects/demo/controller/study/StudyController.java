@@ -132,22 +132,17 @@ public class StudyController {
     }
 
     /**
-     * API 4-2: TODO 플래너 조회 (날짜별)
-     * URL: GET /api/studies/{studyId}/todos?date=YYYY-MM-DD
-     * (로그인 필요)
-     * @param studyId (Path Variable)
-     * @param date (Query Parameter, YYYY-MM-DD 형식)
-     * @return 200 OK (List<TodoPlannerResponse>)
+     * API 4-2: TODO 플래너 조회
      */
     @GetMapping("/{studyId}/todos")
-    public ApiResponse<List<TodoPlannerResponse>> getStudyTodos(
+    //  List<TodoPlannerResponse> -> TodoPlannerResponse
+    public ApiResponse<TodoPlannerResponse> getStudyTodos(
             @PathVariable Integer studyId,
-            @RequestParam LocalDate date) { // ⭐️ String "YYYY-MM-DD"가 자동으로 LocalDate로 변환됩니다.
+            @RequestParam LocalDate date) {
 
-        // 1. StudyService 호출
-        List<TodoPlannerResponse> responseDto = studyService.getStudyTodos(studyId, date);
+        // 서비스 호출
+        TodoPlannerResponse responseDto = studyService.getStudyTodos(studyId, date);
 
-        // 2. 200 OK 응답 반환
         return ApiResponse.onSuccess(responseDto);
     }
     /**

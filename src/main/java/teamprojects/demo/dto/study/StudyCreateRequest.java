@@ -22,9 +22,13 @@ import java.util.List;
 public class StudyCreateRequest {
 
     // ✅ 필수 1. 제목
-    @NotBlank(message = "스터디 제목은 필수입니다.")
+    @NotBlank(message = "모집글 제목(title)은 필수입니다.")
     @Size(max = 100, message = "스터디 제목은 100자 이내여야 합니다.")
     private String title;
+
+    @NotBlank(message = "스터디 이름(studyName)은 필수입니다.")
+    @Size(max = 50, message = "스터디 이름은 50자 이내여야 합니다.")
+    private String studyName;
 
     // ✅ 필수 2. 내용
     @NotBlank(message = "스터디 상세 내용은 필수입니다.")

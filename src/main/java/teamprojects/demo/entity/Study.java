@@ -74,10 +74,10 @@ public class Study {
     @Builder.Default // 빌더 패턴 사용 시 초기화 유지
     private List<StudyMember> studyMembers = new ArrayList<>();
 
-    public void updateTitle(String title) {
-        this.title = title;
-        this.studyName = title; // (아까 studyName 필드를 지웠으면 이 줄은 필요 없음)
-    }
+    public void updateTitle(String title) { this.title = title; }
+
+    public void updateStudyName(String studyName) { this.studyName = studyName; }
+
     public void updateContent(String content) {
         this.content = content;
     }

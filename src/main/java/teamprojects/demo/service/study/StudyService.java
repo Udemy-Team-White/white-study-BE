@@ -189,7 +189,7 @@ public class StudyService {
         // 2. 스터디 생성
         Study newStudy = Study.builder()
                 .title(request.getTitle())
-                .studyName(request.getTitle())
+                .studyName(request.getStudyName())
                 .content(request.getContent())
                 .studyType(type)
                 .maxMembers(request.getMaxMembers())

@@ -71,4 +71,8 @@ public class UserProfile {
     public void updatePoints(Integer points) {
         this.points = points;
     }
+
+    public void updateIntroduction(String introduction) {
+        this.introduction = introduction;
+    }
 }

@@ -280,23 +280,43 @@ public class UserService {
     }
 
     /**
-     * API 3-2-1: 닉네임 수정 (분리됨)
-     * Response: 변경된 User 객체 반환
+     * API 3-2-1: 닉네임 및 Bio 수정 (기능 확장됨)
      */
     @Transactional
     public User updateNickname(Integer userId, UserNicknameUpdateRequest request) {
+        // 1. 유저 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
 
-        // 변경하려는 닉네임이 현재와 다를 경우 중복 체크
-        if (!user.getUsername().equals(request.getUsername())) {
-            // 409 Conflict: 이미 사용 중인 닉네임
-            if (userRepository.existsByUsername(request.getUsername())) {
-                throw new CustomException(ErrorStatus.USERNAME_ALREADY_EXISTS);
+        // 2. 닉네임 변경 로직 (기존 유지)
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            if (!user.getUsername().equals(request.getUsername())) {
+                if (userRepository.existsByUsername(request.getUsername())) {
+                    throw new CustomException(ErrorStatus.USERNAME_ALREADY_EXISTS);
+                }
+                user.updateUsername(request.getUsername());
             }
-            // 변경 적용
-            user.updateUsername(request.getUsername());
         }
+
+        // 3. ⭐️ [추가됨] Bio(자기소개) 변경 로직
+        // UserProfile을 찾아서 업데이트합니다.
+        if (request.getBio() != null) { // bio 값이 들어왔을 때만 수정
+            UserProfile profile = userProfileRepository.findByUser(user)
+                    .orElseGet(() -> {
+                        // 혹시 프로필이 없으면 새로 만듦 (안전장치)
+                        UserProfile newProfile = UserProfile.builder()
+                                .user(user)
+                                .username(user.getUsername())
+                                .points(0)
+                                .reliabilityScore(50)
+                                .build();
+                        return userProfileRepository.save(newProfile);
+                    });
+
+            // 엔티티의 introduction 필드 업데이트
+            profile.updateIntroduction(request.getBio());
+        }
+
         return user;
     }
 

@@ -49,23 +49,21 @@ public class UserController {
 
     /**
      * API 3-2-1: 닉네임 수정
-     * URL: PATCH /api/users/me/nickname
+     * URL: PATCH /api/users/me/username
      */
-    @PatchMapping("/me/nickname")
+    @PatchMapping("/me/username")
     public ApiResponse<UserProfileUpdateResponse> updateNickname(
             @Valid @RequestBody UserNicknameUpdateRequest request) {
 
         Integer userId = getAuthedUserId();
 
-        // 서비스 호출
         User updatedUser = userService.updateNickname(userId, request);
 
-        // 응답 DTO 생성 (명세서: data: { username: "..." })
         UserProfileUpdateResponse response = UserProfileUpdateResponse.builder()
                 .username(updatedUser.getUsername())
                 .build();
 
-        return ApiResponse.onSuccess(response, "프로필 정보(닉네임)가 성공적으로 수정되었습니다.");
+        return ApiResponse.onSuccess(response, "닉네임이 성공적으로 수정되었습니다.");
     }
 
     /**

@@ -53,6 +53,7 @@ import teamprojects.demo.entity.*;
 import teamprojects.demo.repository.*;
 import teamprojects.demo.repository.PointHistoryRepository;
 import java.time.Duration;
+import java.util.Map;
 
 
 
@@ -444,12 +445,12 @@ public class StudyService {
     }
 
     /**
-     * API 4-3: TODO 플래너(그룹) 생성 (수정: 날짜 자동 계산 로직 적용)
+     * API 4-3: TODO 플래너(그룹) 생성 (수정: 최소 7일 간격 보장)
      */
     @Transactional
     public TodoListCreateResponse createTodoList(Integer studyId, TodoListCreateRequest request) {
 
-        // 1. 유저 & 스터디 확인 (권한 체크)
+        // 1. 유저 & 스터디 확인 (기존 동일)
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
         User currentUser = userRepository.findById(currentUserId)
@@ -461,47 +462,50 @@ public class StudyService {
             throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // 2. ⭐️ [핵심] 다음 targetDate 자동 계산
+        // 2. ⭐️ [핵심 수정] 다음 targetDate 자동 계산
         LocalDateTime nextTargetDate;
 
-        // (1) 요청에 날짜가 있으면 그걸 우선 사용 (강제 지정 기능)
+        // (1) 요청에 날짜가 있으면 그걸 우선 사용
         if (request.getTargetDate() != null) {
             nextTargetDate = request.getTargetDate();
         }
-        // (2) 요청에 날짜가 없으면(null) 자동 계산
+        // (2) 자동 계산 로직
         else {
-            // DB에서 가장 최근 TodoList 조회
             TodoList lastTodoList = todoListRepository.findTop1ByUserAndStudyOrderByTargetDateDesc(currentUser, study)
                     .orElse(null);
 
             if (lastTodoList == null) {
-                // 처음 만드는 거라면? -> 스터디 시작일 기준 (시작일 없으면 오늘)
-                nextTargetDate = study.getStartDate() != null ? study.getStartDate() : LocalDateTime.now();
+                // 처음 만드는 경우: 스터디 시작일 기준
+                LocalDateTime baseDate = study.getStartDate() != null ? study.getStartDate() : LocalDateTime.now();
+
+                // ⭐️ [수정] 시작일 + 7일 (최소 1주일 뒤 목표로 설정)
+                // 프론트 요청: "임의로 7일이라는 기간을 넣어줄 수 있을까요?" -> OK!
+                nextTargetDate = baseDate.plusWeeks(1);
+
             } else {
-                // 이미 있다면? -> 마지막 날짜 + 주기 (일단 WEEKLY 기준 7일 추가)
-                // (나중에 study.getTodoCycle() 값에 따라 1일/7일 분기 처리가능)
+                // 이미 있는 경우: 마지막 목표일 + 7일
                 nextTargetDate = lastTodoList.getTargetDate().plusWeeks(1);
             }
         }
 
-        // 3. 제목 자동 생성 (요청 없으면)
+        // 3. 제목 자동 생성 (기존 동일)
         String title = request.getTitle();
         if (title == null || title.isBlank()) {
-            // 예: "2025-11-28 목표" 처럼 날짜를 제목으로 자동 설정
+            // 날짜 포맷 예쁘게 (yyyy-MM-dd)
             title = nextTargetDate.toLocalDate().toString() + " 목표";
         }
 
-        // 4. 저장
+        // 4. 저장 (기존 동일)
         TodoList newTodoList = TodoList.builder()
                 .study(study)
                 .user(currentUser)
                 .title(title)
-                .targetDate(nextTargetDate) // ⭐️ 자동 계산된 날짜 저장
+                .targetDate(nextTargetDate)
                 .build();
 
         newTodoList = todoListRepository.save(newTodoList);
 
-        // 5. 응답 DTO 반환 (items는 빈 리스트)
+        // 5. 응답 (기존 동일)
         return TodoListCreateResponse.builder()
                 .todoListId(newTodoList.getId())
                 .title(newTodoList.getTitle())
@@ -512,30 +516,38 @@ public class StudyService {
 
     /**
      * API 4-4: TODO 항목 생성 로직 (Service)
-     * listId: Path Variable로 받은 TodoList ID
+     * 수정사항: orderIndex(순서) 값 자동 주입 추가
      */
     @Transactional
     public TodoItemResponse createTodoItem(Integer listId, TodoItemCreateRequest request) {
 
-        // 1. 현재 사용자 확인 (401 Unauthorized 방지)
+        // 1. 현재 사용자 확인
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
 
-        // 2. TodoList 존재 확인 (404 Not Found)
+        // 2. TodoList 존재 확인
         TodoList todoList = todoListRepository.findById(listId)
-                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+                .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 3. 권한 확인 (403 Forbidden)
-        // TodoList의 소유자(User)와 현재 로그인한 유저의 ID가 일치하는지 확인
+        // 3. 권한 확인 (본인 TodoList가 맞는지)
         if (!todoList.getUser().getId().equals(currentUserId)) {
-            throw new CustomException(ErrorStatus._FORBIDDEN); // ⭐️ 403 Forbidden 반환
+            throw new CustomException(ErrorStatus._FORBIDDEN);
         }
+
+        // ⭐️ [핵심 수정] 순서(orderIndex) 계산
+        // 기존 아이템 개수 + 1을 해서 맨 마지막 순서로 설정합니다.
+        // (list가 null일 경우를 대비해 안전하게 처리)
+        int nextOrder = (todoList.getTodoItems() == null) ? 1 : todoList.getTodoItems().size() + 1;
 
         // 4. TodoItem Entity 생성
         TodoItem newItem = TodoItem.builder()
                 .todoList(todoList)
                 .content(request.getContent())
-                .isCompleted(false) // 명세대로 항상 false로 생성
+                .isCompleted(false)
+
+                // ⭐️ [추가됨] DB 에러 방지용 순서 값 주입!
+                .orderIndex(nextOrder)
+
                 .build();
 
         newItem = todoItemRepository.save(newItem);

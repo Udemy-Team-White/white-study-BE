@@ -12,6 +12,9 @@ import teamprojects.demo.global.utils.SecurityUtils;
 import teamprojects.demo.global.common.exception.CustomException;
 import teamprojects.demo.global.common.code.status.ErrorStatus;
 import jakarta.validation.Valid;
+import teamprojects.demo.dto.user.UserNicknameUpdateRequest;
+import teamprojects.demo.dto.user.UserPasswordUpdateRequest;
+import teamprojects.demo.dto.user.UserProfileUpdateResponse;
 
 
 @RestController
@@ -45,24 +48,40 @@ public class UserController {
     }
 
     /**
-     * API 3-2: 프로필 수정 요청
-     * [PATCH] /api/users/me/profile
+     * API 3-2-1: 닉네임 수정
+     * URL: PATCH /api/users/me/nickname
      */
-    @PatchMapping("/me/profile")
-    public ApiResponse<UserProfileUpdateResponse> updateProfile(
-            @Valid @RequestBody UserProfileUpdateRequest request
-    ) {
-        // ⭐️ [수정됨] 진짜 로그인한 유저 ID 가져오기
+    @PatchMapping("/me/nickname")
+    public ApiResponse<UserProfileUpdateResponse> updateNickname(
+            @Valid @RequestBody UserNicknameUpdateRequest request) {
+
         Integer userId = getAuthedUserId();
 
-        // 서비스 호출 (진짜 유저 ID 전달)
-        User updatedUser = userService.updateProfile(userId, request);
+        // 서비스 호출
+        User updatedUser = userService.updateNickname(userId, request);
 
+        // 응답 DTO 생성 (명세서: data: { username: "..." })
         UserProfileUpdateResponse response = UserProfileUpdateResponse.builder()
                 .username(updatedUser.getUsername())
                 .build();
 
-        return ApiResponse.onSuccess(response);
+        return ApiResponse.onSuccess(response, "프로필 정보(닉네임)가 성공적으로 수정되었습니다.");
+    }
+
+    /**
+     * API 3-2-2: 비밀번호 수정
+     * URL: PATCH /api/users/me/password
+     */
+    @PatchMapping("/me/password")
+    public ApiResponse<Void> updatePassword(
+            @Valid @RequestBody UserPasswordUpdateRequest request) {
+
+        Integer userId = getAuthedUserId();
+
+        userService.updatePassword(userId, request);
+
+        // 비밀번호 변경은 데이터 반환 없이 메시지만 줍니다.
+        return ApiResponse.onSuccess(null, "비밀번호가 성공적으로 수정되었습니다.");
     }
     /**
      * API 3-3: 내 스터디 목록 조회

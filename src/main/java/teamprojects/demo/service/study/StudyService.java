@@ -380,12 +380,12 @@ public class StudyService {
                 .build();
     }
     /**
-     * API 4-2: TODO 플래너 조회 (최종: 단일 객체 반환)
+     * API 4-2: TODO 플래너 조회 (최종: 없으면 +7일 규칙으로 자동 생성)
      */
-    @Transactional
-    public TodoPlannerResponse getStudyTodos(Integer studyId, LocalDate requestDate) { // ⭐️ List 제거
+    @Transactional // 쓰기 작업 포함
+    public TodoPlannerResponse getStudyTodos(Integer studyId, LocalDate requestDate) {
 
-        // 1. 유저 & 스터디 확인 (기존 동일)
+        // 1. 유저 & 스터디 확인
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
         User currentUser = userRepository.findById(currentUserId)
@@ -397,7 +397,7 @@ public class StudyService {
             throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // 2. 날짜 계산 (기존 동일)
+        // 2. 검색 기준 날짜 계산
         LocalDate searchDate = requestDate;
         if ("WEEKLY".equalsIgnoreCase(study.getTodoCycle())) {
             searchDate = requestDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
@@ -406,24 +406,43 @@ public class StudyService {
         LocalDateTime startOfDay = searchDate.atStartOfDay();
         LocalDateTime endOfDay = searchDate.atTime(23, 59, 59);
 
-        // 3. ⭐️ [핵심 변경] 단건 조회 및 처리
+        // 3. DB 조회
         TodoList todoList = todoListRepository.findFirstByUserAndStudyAndTargetDateBetween(
-                        currentUser, study, startOfDay, endOfDay)
-                .orElse(null);
+                currentUser, study, startOfDay, endOfDay).orElse(null);
 
-        // 없으면 생성!
+        // ⭐️ 4. [핵심 수정] 없으면 자동 생성 (날짜 계산 로직 적용)
         if (todoList == null) {
-            String defaultTitle = searchDate.toString() + " 주차 목표";
+            LocalDateTime nextTargetDate;
+
+            // (1) 마지막 기록 찾기
+            TodoList lastTodoList = todoListRepository.findTop1ByUserAndStudyOrderByTargetDateDesc(currentUser, study)
+                    .orElse(null);
+
+            if (lastTodoList == null) {
+                // 처음이면: 스터디 시작일 기준 + 7일 (프론트 요청: 1주일 뒤로)
+                LocalDateTime baseDate = study.getStartDate() != null ? study.getStartDate() : LocalDateTime.now();
+                nextTargetDate = baseDate.plusWeeks(1);
+            } else {
+                // 있으면: 마지막 날짜 + 7일
+                nextTargetDate = lastTodoList.getTargetDate().plusWeeks(1);
+            }
+
+            // 제목 생성
+            String defaultTitle = nextTargetDate.toLocalDate().toString() + " 목표";
+
+            // 저장
             todoList = TodoList.builder()
                     .study(study)
                     .user(currentUser)
                     .title(defaultTitle)
-                    .targetDate(startOfDay)
+                    .targetDate(nextTargetDate)
                     .build();
             todoList = todoListRepository.save(todoList);
+
+            // (참고: searchDate 변수를 방금 만든 날짜로 갱신해서 화면에 보여줄 수도 있음)
         }
 
-        // 4. DTO 변환 (리스트 반복문 없이 바로 변환!)
+        // 5. DTO 변환
         List<TodoItem> items = (todoList.getTodoItems() != null) ? todoList.getTodoItems() : new ArrayList<>();
 
         List<TodoPlannerResponse.TodoItemDto> itemDtos = items.stream()
@@ -434,12 +453,11 @@ public class StudyService {
                         .build())
                 .collect(Collectors.toList());
 
-        // ⭐️ 단일 객체 반환
         return TodoPlannerResponse.builder()
                 .todoListId(todoList.getId())
                 .title(todoList.getTitle())
-                .cycleStartDate(searchDate.toString())
-                .targetDate(todoList.getTargetDate().toLocalDate().toString())
+                .cycleStartDate(searchDate.toString()) // 요청했던 기준 날짜
+                .targetDate(todoList.getTargetDate().toLocalDate().toString()) // 실제 생성된 날짜 (7일 뒤)
                 .createdDate(todoList.getCreatedAt().toLocalDate().toString())
                 .items(itemDtos)
                 .build();

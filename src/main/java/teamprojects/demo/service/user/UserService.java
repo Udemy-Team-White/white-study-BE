@@ -24,7 +24,6 @@ import teamprojects.demo.dto.user.MypageDataResponse;
 import teamprojects.demo.entity.Study;
 import teamprojects.demo.global.utils.SecurityUtils;
 import teamprojects.demo.repository.StudyMemberRepository;
-import teamprojects.demo.dto.user.UserProfileUpdateRequest;
 import teamprojects.demo.dto.study.MyStudiesQueryRequest;
 import teamprojects.demo.dto.study.MyStudiesListResponse;
 import teamprojects.demo.dto.study.StudySummaryDTO;
@@ -59,11 +58,13 @@ import teamprojects.demo.dto.study.StudyInfoDTO;
 import teamprojects.demo.dto.study.TodayProgressDTO;
 import teamprojects.demo.dto.study.ReportSummaryDTO;
 import teamprojects.demo.dto.study.MemberSummaryDTO;
-import teamprojects.demo.entity.*;
 import teamprojects.demo.repository.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+
+import teamprojects.demo.dto.user.UserNicknameUpdateRequest;
+import teamprojects.demo.dto.user.UserPasswordUpdateRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -279,63 +280,43 @@ public class UserService {
     }
 
     /**
-     * API 3-2: 사용자 프로필 수정 로직 (닉네임, 비밀번호)
-     *
-     * @param userId  현재 로그인된 사용자의 ID (Security Context에서 획득)
-     * @param request 업데이트 요청 DTO
-     * @return 변경된 User Entity
+     * API 3-2-1: 닉네임 수정 (분리됨)
+     * Response: 변경된 User 객체 반환
      */
-    @Transactional // 쓰기 작업이므로 @Transactional 필요
-    public User updateProfile(Integer userId, UserProfileUpdateRequest request) {
-
-        // 1. 현재 사용자 조회
-        // (ID를 찾지 못할 경우의 예외는 ErrorStatus에 _NOT_FOUND 또는 USER_NOT_FOUND가 필요합니다.)
+    @Transactional
+    public User updateNickname(Integer userId, UserNicknameUpdateRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorStatus._BAD_REQUEST));
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
 
-        // --- 2. 닉네임 변경 처리 ---
-        if (request.getUsername() != null && !request.getUsername().isBlank()) {
-
-            // 변경하려는 닉네임이 현재 닉네임과 다를 경우에만 중복 체크
-            if (!user.getUsername().equals(request.getUsername())) {
-
-                // 닉네임 중복 확인 (Repository에 existsByUsername 메서드 선언 완료)
-                if (userRepository.existsByUsername(request.getUsername())) {
-                    // 닉네임 중복 시 409 Conflict 반환 (ErrorStatus에 USERNAME_ALREADY_EXISTS 필요)
-                    throw new CustomException(ErrorStatus.EMAIL_ALREADY_EXISTS);
-                }
-
-                // Entity에 닉네임 업데이트 메서드가 있어야 합니다.
-                user.updateUsername(request.getUsername());
+        // 변경하려는 닉네임이 현재와 다를 경우 중복 체크
+        if (!user.getUsername().equals(request.getUsername())) {
+            // 409 Conflict: 이미 사용 중인 닉네임
+            if (userRepository.existsByUsername(request.getUsername())) {
+                throw new CustomException(ErrorStatus.USERNAME_ALREADY_EXISTS);
             }
+            // 변경 적용
+            user.updateUsername(request.getUsername());
         }
-
-        // --- 3. 비밀번호 변경 처리 ---
-        if (request.getNewPassword() != null && !request.getNewPassword().isBlank()) {
-
-            // 새 비밀번호가 있을 경우, 현재 비밀번호는 필수입니다.
-            if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
-                // 400 Bad Request 반환 (명세: "현재 비밀번호가 틀렸거나...")
-                throw new CustomException(ErrorStatus._BAD_REQUEST);
-            }
-
-            // 현재 비밀번호 일치 확인
-            if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-                // 400 Bad Request 반환 (명세: "현재 비밀번호가 일치하지 않습니다.")
-                // (ErrorStatus에 PASSWORD_MISMATCH가 필요하지만, 우선 _BAD_REQUEST를 사용합니다.)
-                throw new CustomException(ErrorStatus._BAD_REQUEST);
-            }
-
-            // 새 비밀번호 암호화 후 업데이트
-            String newEncodedPassword = passwordEncoder.encode(request.getNewPassword());
-            // Entity에 비밀번호 업데이트 메서드가 있어야 합니다.
-            user.updatePassword(newEncodedPassword);
-        }
-
-        // JPA @Transactional 덕분에 user 객체가 변경되면 DB에 자동 반영됩니다.
         return user;
     }
 
+    /**
+     * API 3-2-2: 비밀번호 수정 (분리됨)
+     */
+    @Transactional
+    public void updatePassword(Integer userId, UserPasswordUpdateRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+
+        // 400 Bad Request: 현재 비밀번호 불일치
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new CustomException(ErrorStatus.PASSWORD_MISMATCH);
+        }
+
+        // 새 비밀번호 암호화 및 변경
+        String newEncodedPassword = passwordEncoder.encode(request.getNewPassword());
+        user.updatePassword(newEncodedPassword);
+    }
     /**
      * API 3-3: 내 스터디 목록 조회 로직 (최종 수정: ALL 필터 추가)
      */
@@ -489,7 +470,7 @@ public class UserService {
     }
 
     /**
-     * API 4-1: 스터디 대시보드 초기 데이터 조회 로직 (최종 수정)
+     * API 4-1: 스터디 대시보드 초기 데이터 조회 로직 (최종 수정: 멤버 프로필 정보 추가)
      */
     @Transactional(readOnly = true)
     public StudyDashboardResponse getDashboardData(Integer studyId, Integer userId) {
@@ -503,7 +484,6 @@ public class UserService {
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
         // 3. 권한 체크 및 내 멤버 정보 가져오기
-        // (단순 exists 체크 대신, 객체를 가져와서 myMemberInfo 변수에 담습니다.)
         StudyMember myMemberInfo = studyMemberRepository.findByUserAndStudy(user, study)
                 .orElseThrow(() -> new CustomException(ErrorStatus._FORBIDDEN));
 
@@ -562,12 +542,27 @@ public class UserService {
                         .build())
                 .collect(Collectors.toList());
 
+        // ⭐️ [수정됨] 멤버 목록 매핑 시 프로필 정보(이미지, 아이템) 추가
         List<MemberSummaryDTO> memberDTOs = members.stream()
-                .map(member -> MemberSummaryDTO.builder()
-                        .userId(member.getUser().getId())
-                        .username(member.getUser().getUsername())
-                        .role(member.getRole().name())
-                        .build())
+                .map(member -> {
+                    User u = member.getUser();
+
+                    // 프로필 조회 (없으면 빌더로 빈 객체 생성)
+                    UserProfile profile = userProfileRepository.findByUser(u)
+                            .orElse(UserProfile.builder().user(u).build());
+
+                    // 아이템 조회 (임시 빈 리스트 - 나중에 구현)
+                    List<String> equippedItems = new ArrayList<>();
+
+                    return MemberSummaryDTO.builder()
+                            .userId(u.getId())
+                            .username(u.getUsername())
+                            .role(member.getRole().name())
+                            // ⭐️ 추가된 필드 매핑
+                            .imgUrl(profile.getProfileImageUrl())
+                            .equippedItems(equippedItems)
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         // 9. 최종 응답 DTO 반환

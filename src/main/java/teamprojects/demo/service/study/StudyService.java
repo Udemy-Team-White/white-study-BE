@@ -378,52 +378,64 @@ public class StudyService {
                 .build();
     }
     /**
-     * API 4-2: TODO 플래너 조회 (수정: 사이클 자동 계산 및 추가 정보 반환)
+     * API 4-2: TODO 플래너 조회 (최종: 없으면 자동 생성 기능 추가)
      */
-    @Transactional(readOnly = true)
+    @Transactional // ⭐️ [수정] 쓰기 작업(자동 생성)이 들어가므로 readOnly 제거!
     public List<TodoPlannerResponse> getStudyTodos(Integer studyId, LocalDate requestDate) {
 
-        // 1. 현재 사용자 확인
+        // 1. 유저 & 스터디 확인
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
-
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
-
-        // 2. 스터디 확인
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 3. 멤버 자격 확인
         if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
-            throw new CustomException(ErrorStatus.STUDY_NOT_FOUND); // 권한 없음
+            throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // ⭐️ [수정] 4. 사이클에 따른 '검색 기준 날짜' 계산
-        LocalDate searchDate = requestDate; // 기본은 요청 날짜 그대로
-
-        // 만약 스터디 주기가 'WEEKLY'라면? -> "그 주의 월요일"로 강제 변경!
-        // (프론트가 목요일을 보내도, 백엔드는 월요일 날짜로 저장된 TODO를 찾습니다)
+        // 2. 사이클에 따른 '기준 날짜' 계산
+        LocalDate searchDate = requestDate;
         if ("WEEKLY".equalsIgnoreCase(study.getTodoCycle())) {
             searchDate = requestDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
         }
-        // (필요 시 MONTHLY 등 다른 주기 로직 추가 가능)
 
-        // 5. DB 조회 (계산된 날짜 searchDate로 조회!)
-        // 하루 전체 범위 (00:00:00 ~ 23:59:59)
+        // 3. DB 조회
         LocalDateTime startOfDay = searchDate.atStartOfDay();
         LocalDateTime endOfDay = searchDate.atTime(23, 59, 59);
 
-        List<TodoList> todoLists = todoListRepository.findByUserAndStudyAndTargetDateBetween(
-                currentUser, study, startOfDay, endOfDay);
+        // 반환받은 리스트가 불변일 수 있으므로, 수정 가능한 ArrayList로 감싸거나 새로 만듭니다.
+        List<TodoList> todoLists = new ArrayList<>(todoListRepository.findByUserAndStudyAndTargetDateBetween(
+                currentUser, study, startOfDay, endOfDay));
 
-        // 6. 응답 DTO 변환 (추가 정보 포함)
-        // 람다식 내부에서 쓰기 위해 final 변수로 복사
+        //  [핵심 추가] 조회 결과가 없으면 -> 자동 생성!
+        if (todoLists.isEmpty()) {
+            // 제목 자동 생성 (예: "2023-11-20 주차 목표")
+            String defaultTitle = searchDate.toString() + " 주차 목표";
+
+            TodoList newList = TodoList.builder()
+                    .study(study)
+                    .user(currentUser)
+                    .title(defaultTitle)
+                    .targetDate(startOfDay) // 계산된 기준 날짜로 설정
+                    .build();
+
+            // DB에 저장하고, 리스트에 추가 (이제 프론트는 빈 목록이 아닌 새 리스트를 받게 됨)
+            newList = todoListRepository.save(newList);
+            todoLists.add(newList);
+        }
+        // ---------------------------------------------------------
+
+        // 4. DTO 변환
         LocalDate finalCycleStartDate = searchDate;
 
         return todoLists.stream()
                 .map(todoList -> {
-                    List<TodoPlannerResponse.TodoItemDto> itemDtos = todoList.getTodoItems().stream()
+                    // (Null 방어) 아이템 리스트가 없으면 빈 리스트 처리
+                    List<TodoItem> items = (todoList.getTodoItems() != null) ? todoList.getTodoItems() : new ArrayList<>();
+
+                    List<TodoPlannerResponse.TodoItemDto> itemDtos = items.stream()
                             .map(todoItem -> TodoPlannerResponse.TodoItemDto.builder()
                                     .todoItemId(todoItem.getId())
                                     .content(todoItem.getContent())
@@ -434,12 +446,9 @@ public class StudyService {
                     return TodoPlannerResponse.builder()
                             .todoListId(todoList.getId())
                             .title(todoList.getTitle())
-
-                            // ⭐️ [추가된 필드들]
-                            .cycleStartDate(finalCycleStartDate.toString()) // 계산된 사이클 시작일 (ex: 월요일)
-                            .targetDate(todoList.getTargetDate().toLocalDate().toString()) // 실제 DB 저장 날짜
-                            .createdDate(todoList.getCreatedAt().toLocalDate().toString()) // 생성일
-
+                            .cycleStartDate(finalCycleStartDate.toString())
+                            .targetDate(todoList.getTargetDate().toLocalDate().toString())
+                            .createdDate(todoList.getCreatedAt().toLocalDate().toString())
                             .items(itemDtos)
                             .build();
                 })

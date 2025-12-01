@@ -348,7 +348,7 @@ public class UserService {
                 Sort.by("createdAt").descending()
         );
 
-        // ⭐️ [수정] String -> Enum 변환 (ALL 처리 추가)
+        // [수정] String -> Enum 변환 (ALL 처리 추가)
         Study.StudyStatus statusEnum = null;
         String reqStatus = request.getStatus();
 
@@ -388,13 +388,13 @@ public class UserService {
 
                     return StudySummaryDTO.builder()
                             .studyId(study.getId())
+                            .title(study.getTitle())
                             .studyName(study.getStudyName())
                             .studyType(study.getStudyType().name())
                             .categories(categories)
                             .currentMembers(study.getCurrentMembers())
                             .maxMembers(study.getMaxMembers())
                             .myRole(myRole)
-                            // ⭐️ [요청 1 해결] DB에 있는 상태값을 그대로 내려줍니다.
                             .status(study.getStatus().name())
                             .build();
                 })
@@ -540,6 +540,7 @@ public class UserService {
         // 8. DTO 매핑 및 조합
         StudyInfoDTO studyInfoDTO = StudyInfoDTO.builder()
                 .studyId(study.getId())
+                .title(study.getTitle())
                 .studyName(study.getStudyName())
                 .status(study.getStatus().name())
                 .startDate(study.getStartDate() != null ? study.getStartDate().toString() : null)

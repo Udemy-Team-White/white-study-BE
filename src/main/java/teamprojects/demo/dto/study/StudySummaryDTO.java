@@ -15,6 +15,7 @@ import java.util.List;
 public class StudySummaryDTO {
 
     private Integer studyId;
+    private String title;
     private String studyName;
     private String studyType;
     private List<String> categories;

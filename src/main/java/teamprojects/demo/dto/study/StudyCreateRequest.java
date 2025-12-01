@@ -26,18 +26,14 @@ public class StudyCreateRequest {
     @Size(max = 100, message = "스터디 제목은 100자 이내여야 합니다.")
     private String title;
 
-    @NotBlank(message = "스터디 이름(studyName)은 필수입니다.")
-    @Size(max = 50, message = "스터디 이름은 50자 이내여야 합니다.")
+    //선택 스터디 이름
     private String studyName;
 
     // ✅ 필수 2. 내용
     @NotBlank(message = "스터디 상세 내용은 필수입니다.")
     private String content;
 
-    // 🔻 선택 1. 스터디 진행 방식 (검증 삭제 -> Null 허용)
     private String studyType;
-
-    // 🔻 선택 2. 카테고리 ID 목록 (검증 삭제 -> Null 허용)
     private List<Integer> categoryIds;
 
     // ✅ 필수 3. 모집 인원
@@ -51,10 +47,11 @@ public class StudyCreateRequest {
     @Future(message = "모집 마감일은 현재 시간 이후여야 합니다.")
     private LocalDateTime closedAt;
 
-    // 🔻 선택 3. 스터디 시작일
+    //  선택 . 시작일 (Null 허용)
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private LocalDateTime startDate;
 
+    // 선택 . 종료일 (Null 허용)
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private LocalDateTime endDate;
 }

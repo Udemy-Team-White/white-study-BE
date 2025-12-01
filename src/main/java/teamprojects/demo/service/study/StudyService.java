@@ -446,57 +446,45 @@ public class StudyService {
     }
 
     /**
-     * API 4-3: TODO 플래너(그룹) 생성 (수정: 최소 7일 간격 보장)
+     * API 4-3: TODO 플래너(그룹) 생성 (수정: 프론트 요청 날짜 무시하고 강제 자동 계산)
      */
     @Transactional
     public TodoListCreateResponse createTodoList(Integer studyId, TodoListCreateRequest request) {
 
-        // 1. 유저 & 스터디 확인 (기존 동일)
+        // ... (1. 유저 & 스터디 확인 & 권한 체크는 기존 코드 그대로 유지) ...
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
-
         if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {
-            throw new CustomException(ErrorStatus._FORBIDDEN);
+            throw new CustomException(ErrorStatus.STUDY_NOT_FOUND);
         }
 
-        // 2. ⭐️ [핵심 수정] 다음 targetDate 자동 계산
+        // 2. ⭐️ [수정] 무조건 자동 계산 로직 실행 (프론트 입력값 무시)
         LocalDateTime nextTargetDate;
 
-        // (1) 요청에 날짜가 있으면 그걸 우선 사용
-        if (request.getTargetDate() != null) {
-            nextTargetDate = request.getTargetDate();
-        }
-        // (2) 자동 계산 로직
-        else {
-            TodoList lastTodoList = todoListRepository.findTop1ByUserAndStudyOrderByTargetDateDesc(currentUser, study)
-                    .orElse(null);
+        TodoList lastTodoList = todoListRepository.findTop1ByUserAndStudyOrderByTargetDateDesc(currentUser, study)
+                .orElse(null);
 
-            if (lastTodoList == null) {
-                // 처음 만드는 경우: 스터디 시작일 기준
-                LocalDateTime baseDate = study.getStartDate() != null ? study.getStartDate() : LocalDateTime.now();
-
-                // ⭐️ [수정] 시작일 + 7일 (최소 1주일 뒤 목표로 설정)
-                // 프론트 요청: "임의로 7일이라는 기간을 넣어줄 수 있을까요?" -> OK!
-                nextTargetDate = baseDate.plusWeeks(1);
-
-            } else {
-                // 이미 있는 경우: 마지막 목표일 + 7일
-                nextTargetDate = lastTodoList.getTargetDate().plusWeeks(1);
-            }
+        if (lastTodoList == null) {
+            // 처음이면: 스터디 시작일 (없으면 오늘)
+            LocalDateTime baseDate = study.getStartDate() != null ? study.getStartDate() : LocalDateTime.now();
+            // + 7일 (1주 뒤)
+            nextTargetDate = baseDate.plusWeeks(1);
+        } else {
+            // 있으면: 마지막 날짜 + 7일
+            nextTargetDate = lastTodoList.getTargetDate().plusWeeks(1);
         }
 
-        // 3. 제목 자동 생성 (기존 동일)
+        // 3. 제목 자동 생성
         String title = request.getTitle();
         if (title == null || title.isBlank()) {
-            // 날짜 포맷 예쁘게 (yyyy-MM-dd)
             title = nextTargetDate.toLocalDate().toString() + " 목표";
         }
 
-        // 4. 저장 (기존 동일)
+        // 4. 저장
         TodoList newTodoList = TodoList.builder()
                 .study(study)
                 .user(currentUser)
@@ -506,7 +494,7 @@ public class StudyService {
 
         newTodoList = todoListRepository.save(newTodoList);
 
-        // 5. 응답 (기존 동일)
+        // 5. 응답
         return TodoListCreateResponse.builder()
                 .todoListId(newTodoList.getId())
                 .title(newTodoList.getTitle())

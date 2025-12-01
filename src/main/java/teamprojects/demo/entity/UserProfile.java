@@ -58,8 +58,15 @@ public class UserProfile {
         }
     }
     public void updateReliabilityScore(Integer changeAmount) {
-        // 기존 점수에 변화량(reward)을 더합니다.
-        this.reliabilityScore += changeAmount;
+        int newScore = this.reliabilityScore + changeAmount;
+
+        if (newScore < 0) {
+            this.reliabilityScore = 0;   // 0점 미만으로 떨어지면 0점으로 고정
+        } else if (newScore > 100) {
+            this.reliabilityScore = 100; // 100점 초과하면 100점으로 고정 (Max Cap)
+        } else {
+            this.reliabilityScore = newScore; // 그 외에는 정상 반영
+        }
     }
     public void updatePoints(Integer points) {
         this.points = points;

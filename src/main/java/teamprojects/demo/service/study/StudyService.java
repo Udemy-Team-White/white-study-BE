@@ -194,6 +194,7 @@ public class StudyService {
                 .studyType(type)
                 .maxMembers(request.getMaxMembers())
                 .closedAt(request.getClosedAt())
+                .endDate(request.getEndDate())
                 .startDate(request.getStartDate())
                 .status(Study.StudyStatus.RECRUITING)
                 .leader(leader)

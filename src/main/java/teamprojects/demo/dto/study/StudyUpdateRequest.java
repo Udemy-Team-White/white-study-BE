@@ -12,6 +12,7 @@ import java.util.List;
 public class StudyUpdateRequest {
 
     private String title;
+    private String studyName;
     private String content;
     private List<Integer> categoryIds;
     private Integer maxMembers;

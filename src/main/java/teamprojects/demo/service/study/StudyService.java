@@ -1269,6 +1269,9 @@ public class StudyService {
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
             study.updateTitle(request.getTitle()); // ⭐️ Entity에 update 메서드 필요
         }
+        if (request.getStudyName() != null && !request.getStudyName().isBlank()) {
+            study.updateStudyName(request.getStudyName());
+        }
         if (request.getContent() != null && !request.getContent().isBlank()) {
             study.updateContent(request.getContent());
         }
@@ -1342,7 +1345,7 @@ public class StudyService {
                 for (TodoList list : todoLists) {
                     // 기존 날짜 + 차이값
                     LocalDateTime newTargetDate = list.getTargetDate().plusDays(daysDiff);
-                    list.updateTargetDate(newTargetDate); // ⭐️ TodoList 엔티티에 메서드 필요
+                    list.updateTargetDate(newTargetDate); // TodoList 엔티티에 메서드 필요
                 }
             }
             // 스터디 시작일 업데이트
@@ -1351,12 +1354,12 @@ public class StudyService {
 
         // 3. 종료일 업데이트
         if (request.getEndDate() != null) {
-            study.updateEndDate(request.getEndDate()); // ⭐️ Study 엔티티 메서드 필요
+            study.updateEndDate(request.getEndDate());
         }
 
         // 4. 주기 업데이트
         if (request.getTodoCycle() != null && !request.getTodoCycle().isBlank()) {
-            study.updateTodoCycle(request.getTodoCycle()); // ⭐️ Study 엔티티 메서드 필요
+            study.updateTodoCycle(request.getTodoCycle());
         }
 
         // (JPA Dirty Checking으로 자동 저장됨)

@@ -1209,38 +1209,40 @@ public class StudyService {
      */
     @Transactional
     public StudyMemberKickResponse kickMember(Integer studyId, Integer memberId) {
+        System.out.println("========== [강퇴 디버깅 시작] =========="); // 로그 1
 
-        // 1. 현재 사용자(리더) 확인
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
+        System.out.println("1. 현재 접속자 ID: " + currentUserId); // 로그 2
 
-        // 2. 스터디 조회
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
+        System.out.println("2. 스터디 리더 ID: " + study.getLeader().getId()); // 로그 3
 
-        // 3. 권한 체크 (리더만 가능)
         if (!study.getLeader().getId().equals(currentUserId)) {
+            System.out.println("❌ [에러] 리더 아님!");
             throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // 4. 대상 멤버 조회
         StudyMember member = studyMemberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(ErrorStatus._NOT_FOUND));
+        System.out.println("3. 강퇴 대상 멤버 ID: " + member.getId()); // 로그 4
 
-        // (멤버가 해당 스터디 소속인지 확인)
         if (!member.getStudy().getId().equals(studyId)) {
+            System.out.println("❌ [에러] 멤버 소속 불일치!");
+            System.out.println(" -> 요청한 Study ID: " + studyId);
+            System.out.println(" -> 멤버의 실제 Study ID: " + member.getStudy().getId());
             throw new CustomException(ErrorStatus._BAD_REQUEST);
         }
 
-        // 5. ⭐️ [방어 로직] 자기 자신 추방 시도 체크 (400 Bad Request)
         if (member.getUser().getId().equals(currentUserId)) {
+            System.out.println("❌ [에러] 자기 자신 강퇴 시도!");
             throw new CustomException(ErrorStatus.CANNOT_KICK_SELF);
         }
 
-        // 6. 삭제 (추방)
         studyMemberRepository.delete(member);
+        System.out.println("✅ [성공] 강퇴 완료!"); // 로그 5
 
-        // 7. 응답 반환
         return StudyMemberKickResponse.builder()
                 .kickedMemberId(memberId)
                 .message("정상적으로 처리되었습니다.")

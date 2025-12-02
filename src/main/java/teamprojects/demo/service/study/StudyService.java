@@ -1250,60 +1250,63 @@ public class StudyService {
     }
 
     /**
-     * API 5-7: 스터디 정보 수정
+     * API 5-7: 스터디 정보 수정 (최종 수정: status 삭제, studyType 추가)
      */
     @Transactional
     public void updateStudy(Integer studyId, StudyUpdateRequest request) {
 
-        // 1. 현재 사용자(리더) 확인
+        // 1. 유저 & 스터디 조회 & 권한 체크 (기존 유지)
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
-
-        // 2. 스터디 조회
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 3. 권한 체크 (리더만 가능)
         if (!study.getLeader().getId().equals(currentUserId)) {
             throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
         // 4. 정보 수정 (값이 있는 것만 수정 - Dirty Checking)
+
+        // (1) 제목 & 이름
         if (request.getTitle() != null && !request.getTitle().isBlank()) {
-            study.updateTitle(request.getTitle()); // ⭐️ Entity에 update 메서드 필요
+            study.updateTitle(request.getTitle());
         }
         if (request.getStudyName() != null && !request.getStudyName().isBlank()) {
             study.updateStudyName(request.getStudyName());
         }
+
+        // (2) 내용 & 인원
         if (request.getContent() != null && !request.getContent().isBlank()) {
             study.updateContent(request.getContent());
         }
         if (request.getMaxMembers() != null) {
-            // (선택) 현재 멤버 수보다 작게 줄일 수 없도록 막는 로직 추가 가능
             study.updateMaxMembers(request.getMaxMembers());
         }
+
+        // (3) 기간 (시작일, 종료일)
         if (request.getStartDate() != null) {
             study.updateStartDate(request.getStartDate());
         }
-        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+        if (request.getEndDate() != null) {
+            study.updateEndDate(request.getEndDate()); // ⭐️ Entity에 메서드 필요
+        }
+
+        // ⭐️ (4) [추가됨] 스터디 타입 (ONLINE/OFFLINE) 수정
+        if (request.getStudyType() != null && !request.getStudyType().isBlank()) {
             try {
-                Study.StudyStatus newStatus = Study.StudyStatus.valueOf(request.getStatus());
-                study.updateStatus(newStatus);
+                Study.StudyType newType = Study.StudyType.valueOf(request.getStudyType());
+                study.updateStudyType(newType); // ⭐️ Entity에 메서드 필요
             } catch (IllegalArgumentException e) {
-                // 잘못된 상태값이면 무시하거나 에러 처리
+                // 잘못된 값이면 무시
             }
         }
 
-        // 5. 카테고리 수정 (기존 삭제 -> 새 연결)
+        // 5. 카테고리 수정 (기존 유지)
         if (request.getCategoryIds() != null) {
-            // 기존 연결 삭제
-            studyHasCategoryRepository.deleteByStudy(study); // ⭐️ Repository에 deleteByStudy 메서드 필요
-
-            // 새 연결 생성
+            studyHasCategoryRepository.deleteByStudy(study);
             for (Integer categoryId : request.getCategoryIds()) {
                 StudyCategory category = studyCategoryRepository.findById(categoryId)
                         .orElseThrow(() -> new CustomException(ErrorStatus.CATEGORY_NOT_FOUND));
-
                 StudyHasCategory link = StudyHasCategory.builder()
                         .study(study)
                         .studyCategory(category)
@@ -1311,8 +1314,6 @@ public class StudyService {
                 studyHasCategoryRepository.save(link);
             }
         }
-
-        // (명시적 save 호출 없어도 Transactional 때문에 자동 반영됨)
     }
     /**
      * API 5-8: 스터디 일정 및 주기 수정

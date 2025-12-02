@@ -120,4 +120,5 @@ public class Study {
     }
     public void updateEndDate(LocalDateTime endDate) { this.endDate = endDate; }
     public void updateTodoCycle(String todoCycle) { this.todoCycle = todoCycle; }
+    public void updateStudyType(StudyType studyType) { this.studyType = studyType; }
 }

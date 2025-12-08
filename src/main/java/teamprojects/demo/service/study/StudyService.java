@@ -1338,7 +1338,7 @@ public class StudyService {
     @Transactional
     public PraiseResponse sendPraise(Integer studyId, PraiseCreateRequest request) {
 
-        //유저 및 스터디 조회
+        // 유저 및 스터디 조회
         Integer currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new CustomException(ErrorStatus.UNAUTHORIZED));
         User sender = userRepository.findById(currentUserId)
@@ -1361,26 +1361,22 @@ public class StudyService {
             throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
-        long todayPraiseCount = praiseRepository.countBySenderAndCreatedAtAfter(sender, startOfToday);
-        if (todayPraiseCount >= 3) {
-            throw new CustomException(ErrorStatus.PRAISE_LIMIT_EXCEEDED);
-        }
-
-        //칭찬 저장
+        // 칭찬 저장
         Praise praise = Praise.builder()
                 .study(study)
                 .sender(sender)
                 .receiver(receiver)
                 .message(request.getMessage())
-                .isAnonymous(true) // 익명 여부
+                .isAnonymous(true)
                 .build();
         praise = praiseRepository.save(praise);
 
-        // 발신자 보상 지급 (포인트 +0) 없앰 걍
+        // 발신자 보상 지급 (포인트 0점 처리 유지)
         UserProfile senderProfile = userProfileRepository.findByUser(sender)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
         int REWARD_POINTS = 0;
+
+        // 0점이라도 로직상 업데이트 호출 (필요 없다면 이 줄 제거 가능)
         senderProfile.updatePoints(senderProfile.getPoints() + REWARD_POINTS);
 
         PointHistory senderHistory = PointHistory.builder()
@@ -1390,18 +1386,18 @@ public class StudyService {
                 .build();
         pointHistoryRepository.save(senderHistory);
 
-        // 수신자신뢰도 상승 (신뢰도 +1)
+        // 수신자 신뢰도 상승 (신뢰도 +5)
         UserProfile receiverProfile = userProfileRepository.findByUser(receiver)
                 .orElseThrow(() -> new CustomException(ErrorStatus._INTERNAL_SERVER_ERROR));
 
         int RELIABILITY_REWARD = 5; // 칭찬 받으면 5점 상승
-        receiverProfile.addReliabilityScore(RELIABILITY_REWARD); // (엔티티 메서드 사용)
+        receiverProfile.addReliabilityScore(RELIABILITY_REWARD);
 
         // 수신자 히스토리 기록
         ReliabilityHistory receiverHistory = ReliabilityHistory.builder()
                 .user(receiver)
                 .changeAmount(RELIABILITY_REWARD)
-                .reason("칭찬 받음: " + request.getMessage()) // 사유에 메시지 포함 가능
+                .reason("칭찬 받음: " + request.getMessage())
                 .build();
         reliabilityHistoryRepository.save(receiverHistory);
 

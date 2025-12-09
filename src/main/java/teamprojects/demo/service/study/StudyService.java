@@ -696,11 +696,11 @@ public class StudyService {
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorStatus.STUDY_NOT_FOUND));
 
-        // 스터디 진행 상태 체크
-        if (study.getStatus() != Study.StudyStatus.IN_PROGRESS &&
-                study.getStatus() != Study.StudyStatus.RECRUITING_IN_PROGRESS) {
-            throw new CustomException(ErrorStatus.STUDY_TERMINATED);
-        }
+        // 스터디 진행 상태 체크(팀원분의 요청으로 일단 보류)
+        //if (study.getStatus() != Study.StudyStatus.IN_PROGRESS &&
+                //study.getStatus() != Study.StudyStatus.RECRUITING_IN_PROGRESS) {
+            //throw new CustomException(ErrorStatus.STUDY_TERMINATED);
+        //}
 
         // 멤버 자격 확인
         if (!studyMemberRepository.existsByUserAndStudy(currentUser, study)) {

@@ -550,16 +550,17 @@ public class UserService {
                 .map(LocalDateTime::toString)
                 .orElse(null);
 
-        //나의 오늘 진행 상황
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(23, 59, 59);
+        // ... (날짜 설정 부분까지 동일)
+        LocalDateTime startOfDay = LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime endOfDay = LocalDateTime.now().plusYears(1);
 
         Long totalItemsLong = todoItemRepository.countTotalItemsForDashboard(studyId, userId, startOfDay, endOfDay);
         Long completedItemsLong = todoItemRepository.countCompletedItemsForDashboard(studyId, userId, startOfDay, endOfDay);
 
         Integer totalItems = totalItemsLong.intValue();
         Integer completedItems = completedItemsLong.intValue();
+
+        // 실제 개수에 따라 계산되도록 복구
         Integer progressPercentage = (totalItems > 0) ? (int) (((double) completedItems / totalItems) * 100) : 0;
 
         //최근 보고서

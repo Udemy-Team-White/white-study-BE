@@ -707,18 +707,18 @@ public class StudyService {
             throw new CustomException(ErrorStatus._FORBIDDEN);
         }
 
-        // 중복 제출 확인 (오늘 날짜 기준)
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(23, 59, 59);
-
-        boolean alreadySubmitted = selfReportRepository.existsByStudyAndUserAndCreatedAtBetween(
-                study, currentUser, startOfDay, endOfDay
-        );
-
-        if (alreadySubmitted) {
-            throw new CustomException(ErrorStatus.REPORT_ALREADY_SUBMITTED);
-        }
+//        // 중복 제출 확인 (오늘 날짜 기준)  팀원분의 요청으로 일단 보류
+//        LocalDate today = LocalDate.now();
+//        LocalDateTime startOfDay = today.atStartOfDay();
+//        LocalDateTime endOfDay = today.atTime(23, 59, 59);
+//
+//        boolean alreadySubmitted = selfReportRepository.existsByStudyAndUserAndCreatedAtBetween(
+//                study, currentUser, startOfDay, endOfDay
+//        );
+//
+//        if (alreadySubmitted) {
+//            throw new CustomException(ErrorStatus.REPORT_ALREADY_SUBMITTED);
+//        }
 
         // 보고서 저장
         SelfReport newReport = SelfReport.builder()
